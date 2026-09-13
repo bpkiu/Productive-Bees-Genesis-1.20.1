@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PEP",
+    "EUE",
+    "PEP"
+  ],
+  "key": {
+    "E": {
+      "item": "productivebees:honey_treat"
+    },
+    "P": {
+      "item": "minecraft:piston"
+    },
+    "U": {
+      "item": "productivebees:upgrade_base"
+    }
+  },
+  "result": {
+    "item": "productivebeesgenesis:essence_conversion_upgrade",
+    "count": 1
+  }
+}

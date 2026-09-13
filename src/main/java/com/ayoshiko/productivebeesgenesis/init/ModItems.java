@@ -1,0 +1,349 @@
+package com.ayoshiko.productivebeesgenesis.init;
+
+import com.ayoshiko.productivebeesgenesis.ProductiveBeesGenesis;
+import com.ayoshiko.productivebeesgenesis.apiary.ItemBlockMekApiary;
+import com.ayoshiko.productivebeesgenesis.apiary.ItemBlockMekApiaryFactory;
+import com.ayoshiko.productivebeesgenesis.apiary.MekApiaryBlock;
+import com.ayoshiko.productivebeesgenesis.apiary.TileEntityMekApiaryFactory;
+import com.ayoshiko.productivebeesgenesis.compat.emextras.EMECompatLoader;
+import com.ayoshiko.productivebeesgenesis.compat.mekanism_extras.MECompatLoader;
+import com.ayoshiko.productivebeesgenesis.item.ItemInfinityCreationComb;
+import com.ayoshiko.productivebeesgenesis.item.ItemInfinityCreationCombBlock;
+import com.ayoshiko.productivebeesgenesis.item.EssenceConversionUpgradeItem;
+import com.ayoshiko.productivebeesgenesis.item.RawOreSmeltingUpgradeItem;
+import com.ayoshiko.productivebeesgenesis.item.UselessByproductUpgradeItem;
+import com.ayoshiko.productivebeesgenesis.mek.ItemBlockMekCentrifuge;
+import com.ayoshiko.productivebeesgenesis.mek.MekCentrifugeBlock;
+import com.ayoshiko.productivebeesgenesis.mek.MekCompatHooks;
+import com.ayoshiko.productivebeesgenesis.mek.TileEntityMekCentrifugeFactory;
+import com.ayoshiko.productivebeesgenesis.util.PBConstants;
+import com.ayoshiko.productivebeesgenesis.util.BeeTypeNbt;
+import mekanism.common.content.blocktype.BlockTypeTile;
+import mekanism.common.content.blocktype.Machine;
+import mekanism.common.tier.FactoryTier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.item.Item;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
+
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+	 * 物品注册类
+	 * <br/>
+	 * 注册5个MEK离心机BlockItem，添加MekanismDataComponents实现数据持久化。
+	 * DataComponents包括：EJECTOR（弹出器）、SIDE_CONFIG（侧面配置）、
+	 * SECURITY（安全模式）、REDSTONE_CONTROL（红石控制）、UPGRADES（升级）。
+	 * <p>
+	 * EM扩展：当EvolvedMekanism加载时，通过registerEMFactoryItems()动态注册5个EM等级
+	 * 的BlockItem，存入EM_FACTORY_ITEMS Map。注册名与对应方块一致，确保
+	 * MekCentrifugeBlockType.wrapAsBlockRegistryObject()中的Item DeferredHolder能正确解析。
+	 * <p>
+	 * EME扩展：当EvolvedMekanismExtras加载时，委托 {@link EMECompatLoader} 完成 EME 工厂 BlockItem 注册，
+	 * 结果存入 EME_FACTORY_ITEMS 和 EME_APIARY_FACTORY_ITEMS（通配类型，避免编译期依赖 EME 类）。
+	 */
+public final class ModItems {
+
+	public static final DeferredRegister<Item> ITEMS =
+			DeferredRegister.create(Registries.ITEM, ProductiveBeesGenesis.MOD_ID);
+
+	/**
+	 * 类型安全的物品注册辅助方法
+	 * <br/>
+	 * Forge 1.20.1 的 DeferredRegister&lt;Item&gt;.register 返回 RegistryObject&lt;Item&gt;，
+	 * 无法直接赋给 RegistryObject&lt;具体子类&gt; 字段。通过此泛型方法 + unchecked cast 还原具体类型。
+	 * 替代 NeoForge 1.21.1 的 DeferredRegister.Items.register(String, Supplier&lt;T&gt;): RegistryObject&lt;T&gt; 签名。
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends Item> RegistryObject<T> registerItem(String name, java.util.function.Supplier<T> supplier) {
+		return (RegistryObject<T>) (RegistryObject<?>) ITEMS.register(name, supplier);
+	}
+
+	/** 基础MEK离心机BlockItem */
+	public static final RegistryObject<ItemBlockMekCentrifuge> MEK_CENTRIFUGE =
+			registerItem("mek_centrifuge", () -> new ItemBlockMekCentrifuge(ModBlocks.MEK_CENTRIFUGE.get(),
+				machineItemProperties(ModBlocks.MEK_CENTRIFUGE.get())));
+
+	/**
+	 * MEK通用机械蜂箱BlockItem
+	 * <br/>
+	 * 复用machineItemProperties添加Mekanism DataComponents（EJECTOR/SIDE_CONFIG/SECURITY/REDSTONE/UPGRADES）。
+	 * 注意：当前复用MEK_CENTRIFUGE_SIDE_CONFIG（物品标准机器/流体右侧输出/能量仅输入），
+	 * 后续Task 3将创建蜂箱专属侧面配置（可能调整流体输入侧）。
+	 */
+	public static final RegistryObject<ItemBlockMekApiary> MEK_APIARY =
+			registerItem("mek_apiary", () -> new ItemBlockMekApiary(ModBlocks.MEK_APIARY.get(),
+				machineItemProperties(ModBlocks.MEK_APIARY.get())));
+
+	/** 通用机械蜂箱 — 基础工厂BlockItem（含SORTING组件） */
+	public static final RegistryObject<ItemBlockMekApiaryFactory> BASIC_MEK_APIARY_FACTORY =
+			registerItem("basic_mek_apiary_factory",
+					() -> new ItemBlockMekApiaryFactory(ModBlocks.BASIC_MEK_APIARY_FACTORY.get(),
+							machineItemProperties(ModBlocks.BASIC_MEK_APIARY_FACTORY.get())));
+
+	/** 通用机械蜂箱 — 高级工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekApiaryFactory> ADVANCED_MEK_APIARY_FACTORY =
+			registerItem("advanced_mek_apiary_factory",
+					() -> new ItemBlockMekApiaryFactory(ModBlocks.ADVANCED_MEK_APIARY_FACTORY.get(),
+							machineItemProperties(ModBlocks.ADVANCED_MEK_APIARY_FACTORY.get())));
+
+	/** 通用机械蜂箱 — 精英工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekApiaryFactory> ELITE_MEK_APIARY_FACTORY =
+			registerItem("elite_mek_apiary_factory",
+					() -> new ItemBlockMekApiaryFactory(ModBlocks.ELITE_MEK_APIARY_FACTORY.get(),
+							machineItemProperties(ModBlocks.ELITE_MEK_APIARY_FACTORY.get())));
+
+	/** 通用机械蜂箱 — 终极工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekApiaryFactory> ULTIMATE_MEK_APIARY_FACTORY =
+			registerItem("ultimate_mek_apiary_factory",
+					() -> new ItemBlockMekApiaryFactory(ModBlocks.ULTIMATE_MEK_APIARY_FACTORY.get(),
+							machineItemProperties(ModBlocks.ULTIMATE_MEK_APIARY_FACTORY.get())));
+
+	/** 基础工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekCentrifuge> BASIC_MEK_CENTRIFUGE_FACTORY =
+			registerItem("basic_mek_centrifuge_factory",
+					() -> new ItemBlockMekCentrifuge(ModBlocks.BASIC_MEK_CENTRIFUGE_FACTORY.get(),
+							machineItemProperties(ModBlocks.BASIC_MEK_CENTRIFUGE_FACTORY.get())));
+
+	/** 高级工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekCentrifuge> ADVANCED_MEK_CENTRIFUGE_FACTORY =
+			registerItem("advanced_mek_centrifuge_factory",
+					() -> new ItemBlockMekCentrifuge(ModBlocks.ADVANCED_MEK_CENTRIFUGE_FACTORY.get(),
+							machineItemProperties(ModBlocks.ADVANCED_MEK_CENTRIFUGE_FACTORY.get())));
+
+	/** 精英工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekCentrifuge> ELITE_MEK_CENTRIFUGE_FACTORY =
+			registerItem("elite_mek_centrifuge_factory",
+					() -> new ItemBlockMekCentrifuge(ModBlocks.ELITE_MEK_CENTRIFUGE_FACTORY.get(),
+							machineItemProperties(ModBlocks.ELITE_MEK_CENTRIFUGE_FACTORY.get())));
+
+	/** 终极工厂BlockItem */
+	public static final RegistryObject<ItemBlockMekCentrifuge> ULTIMATE_MEK_CENTRIFUGE_FACTORY =
+			registerItem("ultimate_mek_centrifuge_factory",
+					() -> new ItemBlockMekCentrifuge(ModBlocks.ULTIMATE_MEK_CENTRIFUGE_FACTORY.get(),
+							machineItemProperties(ModBlocks.ULTIMATE_MEK_CENTRIFUGE_FACTORY.get())));
+
+	/** 无尽·创世蜜脾 — 自定义蜜脾物品，带 tooltip 提示（bee_type 由创造标签页/事件处理器预置 NBT） */
+	public static final RegistryObject<ItemInfinityCreationComb> INFINITY_CREATION_COMB =
+			registerItem("infinitycreation_comb", () -> new ItemInfinityCreationComb(new Item.Properties()));
+
+	/** 无尽·创世蜜脾块 BlockItem，带 tooltip 提示 */
+	public static final RegistryObject<ItemInfinityCreationCombBlock> INFINITY_CREATION_COMB_BLOCK_ITEM =
+			registerItem("infinitycreation_comb_block",
+					() -> new ItemInfinityCreationCombBlock(ModBlocks.INFINITY_CREATION_COMB_BLOCK.get(),
+							new Item.Properties()));
+
+	/** Discards honey and pollen-puff byproducts in supported hives and centrifuges. */
+	public static final RegistryObject<UselessByproductUpgradeItem> BYPRODUCT_DESTRUCTION_UPGRADE =
+			registerItem("byproduct_destruction_upgrade",
+					() -> new UselessByproductUpgradeItem(new Item.Properties()));
+
+	/** 精华转化升级 — 将产出物品按合成配方压缩/还原（功能型升级） */
+	public static final RegistryObject<EssenceConversionUpgradeItem> ESSENCE_CONVERSION_UPGRADE =
+			registerItem("essence_conversion_upgrade",
+					() -> new EssenceConversionUpgradeItem(new Item.Properties()));
+
+	/** 原矿熔炼升级 — 将原矿自动熔炼为锭（功能型升级） */
+	public static final RegistryObject<RawOreSmeltingUpgradeItem> RAW_ORE_SMELTING_UPGRADE =
+			registerItem("raw_ore_smelting_upgrade",
+					() -> new RawOreSmeltingUpgradeItem(new Item.Properties()));
+
+	/**
+	 * EM工厂BlockItem映射 — 由registerEMFactoryItems()在EM加载时填充
+	 * <br/>
+	 * Key=FactoryTier（EM运行时扩展的枚举值），Value=对应的RegistryObject。
+	 * 使用ConcurrentHashMap保证线程安全。
+	 */
+	public static final Map<FactoryTier, RegistryObject<ItemBlockMekCentrifuge>> EM_FACTORY_ITEMS =
+			new ConcurrentHashMap<>();
+
+	/**
+	 * ME工厂BlockItem映射 — 由registerMEFactoryItems()在ME加载时填充
+	 * <br/>
+	 * Key=AdvancedFactoryTier（ME 独立枚举，运行时由 compat 包写入），Value=对应的 RegistryObject。
+	 * 使用通配类型 {@code Map<Object, RegistryObject<?>>} 避免主注册类编译期依赖 ME 的类
+	 * （AdvancedFactoryTier/ItemBlockMekCentrifuge 的 ME 子类等）。
+	 * 实际填充由 {@link MECompatLoader#registerFactoryItems()} 委托
+	 * {@link com.ayoshiko.productivebeesgenesis.compat.mekanism_extras.MEItemRegistration} 完成。
+	 * 使用 ConcurrentHashMap 保证线程安全。
+	 */
+	public static final Map<Object, RegistryObject<?>> ME_FACTORY_ITEMS = new ConcurrentHashMap<>();
+
+	/**
+	 * EME工厂BlockItem映射 — 由registerEMEFactoryItems()在EME加载时填充
+	 * <br/>
+	 * Key=EMExtraFactoryTier（EME 独立枚举，编译时不存在），Value=对应的 RegistryObject。
+	 * 使用通配类型 {@code Object}/{@code RegistryObject<?>}，避免主注册类编译期依赖 EME 类。
+	 * 实际填充由 {@link EMECompatLoader#registerCentrifugeItems()} 委托
+	 * {@link com.ayoshiko.productivebeesgenesis.compat.emextras.EMEItemRegistration} 完成。
+	 * 使用 ConcurrentHashMap 保证线程安全。
+	 */
+	public static final Map<Object, RegistryObject<?>> EME_FACTORY_ITEMS = new ConcurrentHashMap<>();
+
+	/**
+	 * ME 蜂箱工厂 BlockItem 映射 — 由 registerMEApiaryFactoryItems() 在 ME 加载时填充
+	 * <br/>
+	 * Key=AdvancedFactoryTier（ME 独立枚举，运行时由 compat 包写入），Value=对应的 RegistryObject。
+	 * 使用通配类型 {@code Map<Object, RegistryObject<?>>} 避免主注册类编译期依赖 ME 的类。
+	 * 实际填充由 {@link MECompatLoader#registerApiaryFactoryItems()} 委托
+	 * {@link com.ayoshiko.productivebeesgenesis.compat.mekanism_extras.MEItemRegistration} 完成。
+	 * 使用 ConcurrentHashMap 保证线程安全。
+	 */
+	public static final Map<Object, RegistryObject<?>> ME_APIARY_FACTORY_ITEMS = new ConcurrentHashMap<>();
+
+	/**
+	 * EME 蜂箱工厂 BlockItem 映射 — 由 registerEMEApiaryFactoryItems() 在 EME 加载时填充
+	 * <br/>
+	 * Key=EMExtraFactoryTier（EME 独立枚举，编译时不存在），Value=对应的 RegistryObject。
+	 * 使用通配类型 {@code Object}/{@code RegistryObject<?>}，避免主注册类编译期依赖 EME 类。
+	 * 实际填充由 {@link EMECompatLoader#registerApiaryItems()} 委托
+	 * {@link com.ayoshiko.productivebeesgenesis.compat.emextras.EMEItemRegistration} 完成。
+	 * 使用 ConcurrentHashMap 保证线程安全。
+	 */
+	public static final Map<Object, RegistryObject<?>> EME_APIARY_FACTORY_ITEMS = new ConcurrentHashMap<>();
+
+	/**
+	 * EM 蜂箱工厂 BlockItem 映射 — 由 registerEMApiaryFactoryItems() 在 EM 加载时填充
+	 * <br/>
+	 * Key=FactoryTier（EM 运行时扩展的枚举值），Value=对应的 RegistryObject。
+	 * EM 蜂箱工厂复用 ItemBlockMekApiaryFactory（与原版 4 等级相同）。
+	 * 使用 ConcurrentHashMap 保证线程安全。
+	 */
+	public static final Map<FactoryTier, RegistryObject<ItemBlockMekApiaryFactory>> EM_APIARY_FACTORY_ITEMS =
+			new ConcurrentHashMap<>();
+
+	private ModItems() {}
+
+	/**
+	 * 注册EM等级的工厂BlockItem
+	 * <br/>
+	 * 当EvolvedMekanism加载时，遍历EM_FACTORIES中的方块，为每个方块注册同名的BlockItem。
+	 * 注册名与方块一致（如overclocked_mek_centrifuge_factory），确保MekCentrifugeBlockType
+	 * 中wrapAsBlockRegistryObject()创建的Item DeferredHolder能正确解析。
+	 * <p>
+	 * 调用时机：必须在ModBlocks.registerEMFactories()之后、registerItem(eventBus)之前调用。
+	 */
+	public static void registerEMFactoryItems() {
+		if (!MekCompatHooks.isEvolvedMekanismLoaded()) {
+			return;
+		}
+		for (Map.Entry<FactoryTier, RegistryObject<MekCentrifugeBlock<TileEntityMekCentrifugeFactory,
+			Machine.FactoryMachine<TileEntityMekCentrifugeFactory>>>> entry : ModBlocks.EM_FACTORIES.entrySet()) {
+			FactoryTier tier = entry.getKey();
+			RegistryObject<MekCentrifugeBlock<TileEntityMekCentrifugeFactory,
+				Machine.FactoryMachine<TileEntityMekCentrifugeFactory>>> deferredBlock = entry.getValue();
+			String registryName = tier.getBaseTier().getLowerName() + "_mek_centrifuge_factory";
+			// 注册BlockItem，使用与原版相同的machineItemProperties添加Mekanism DataComponents
+			RegistryObject<ItemBlockMekCentrifuge> deferredItem = registerItem(registryName,
+					() -> new ItemBlockMekCentrifuge(deferredBlock.get(), machineItemProperties(deferredBlock.get())));
+			EM_FACTORY_ITEMS.put(tier, deferredItem);
+		}
+	}
+
+	/**
+	 * 注册ME等级的工厂BlockItem
+	 * <br/>
+	 * 当 MekanismExtras 加载时，委托 {@link MECompatLoader#registerFactoryItems()}
+	 * 完成实际注册（避免主注册类编译期依赖 ME 的类）。
+	 * 注册名与方块一致（如 absolute_extra_mek_centrifuge_factory），确保 MekCentrifugeMEBlockType
+	 * 中 wrapAsBlockRegistryObject() 创建的 Item DeferredHolder 能正确解析。
+	 * 注册结果填充到 {@link #ME_FACTORY_ITEMS}（通配类型）。
+	 * <p>
+	 * 调用时机：必须在 ModBlocks.registerMEFactories() 之后、registerItem(eventBus) 之前调用。
+	 */
+	public static void registerMEFactoryItems() {
+		if (MekCompatHooks.isMekanismExtrasLoaded()) {
+			MECompatLoader.registerFactoryItems();
+		}
+	}
+
+	/**
+	 * 注册EME等级的工厂BlockItem
+	 * <br/>
+	 * 当 EvolvedMekanismExtras 加载时，委托 {@link EMECompatLoader#registerCentrifugeItems()}
+	 * 完成实际注册（避免主注册类编译期依赖 EME 类）。
+	 * 注册结果填充到 {@link #EME_FACTORY_ITEMS}（通配类型）。
+	 * <p>
+	 * 调用时机：必须在 {@link ModBlocks#registerEMEFactories()} 之后、registerItem(eventBus) 之前调用。
+	 */
+	public static void registerEMEFactoryItems() {
+		if (!MekCompatHooks.isEvolvedMekanismExtrasLoaded()) {
+			return;
+		}
+		EMECompatLoader.registerCentrifugeItems();
+	}
+
+	/**
+	 * 注册 ME 等级的蜂箱工厂 BlockItem
+	 * <br/>
+	 * 当 MekanismExtras 加载时，委托 {@link MECompatLoader#registerApiaryFactoryItems()}
+	 * 完成实际注册（避免主注册类编译期依赖 ME 的类）。
+	 * 注册名与方块一致（如 absolute_extra_mek_apiary_factory），确保 MekApiaryMEBlockType
+	 * 中 wrapAsBlockRegistryObject() 创建的 Item DeferredHolder 能正确解析。
+	 * 使用 ItemBlockMekApiaryFactory（与原版工厂蜂箱相同的 ItemBlock 类）。
+	 * 注册结果填充到 {@link #ME_APIARY_FACTORY_ITEMS}（通配类型）。
+	 * <p>
+	 * 调用时机：必须在 ModBlocks.registerMEApiaryFactories() 之后、registerItem(eventBus) 之前调用。
+	 */
+	public static void registerMEApiaryFactoryItems() {
+		if (MekCompatHooks.isMekanismExtrasLoaded()) {
+			MECompatLoader.registerApiaryFactoryItems();
+		}
+	}
+
+	/**
+	 * 注册 EM 等级的蜂箱工厂 BlockItem
+	 * <br/>
+	 * 当 EvolvedMekanism 加载时，遍历 EM_APIARY_FACTORIES 中的方块，为每个方块注册同名的 BlockItem。
+	 * 注册名与方块一致（如 overclocked_mek_apiary_factory），确保 MekApiaryFactoryBlockType
+	 * 中 wrapAsBlockRegistryObject() 创建的 Item DeferredHolder 能正确解析。
+	 * 使用 ItemBlockMekApiaryFactory（与原版工厂蜂箱相同的 ItemBlock 类）。
+	 * <p>
+	 * 调用时机：必须在 ModBlocks.registerEMApiaryFactories() 之后、registerItem(eventBus) 之前调用。
+	 */
+	public static void registerEMApiaryFactoryItems() {
+		if (!MekCompatHooks.isEvolvedMekanismLoaded()) {
+			return;
+		}
+		for (Map.Entry<FactoryTier, RegistryObject<MekApiaryBlock<TileEntityMekApiaryFactory,
+			BlockTypeTile<TileEntityMekApiaryFactory>>>> entry : ModBlocks.EM_APIARY_FACTORIES.entrySet()) {
+			FactoryTier tier = entry.getKey();
+			RegistryObject<MekApiaryBlock<TileEntityMekApiaryFactory,
+				BlockTypeTile<TileEntityMekApiaryFactory>>> deferredBlock = entry.getValue();
+			String registryName = tier.getBaseTier().getLowerName() + "_mek_apiary_factory";
+			RegistryObject<ItemBlockMekApiaryFactory> deferredItem = registerItem(registryName,
+					() -> new ItemBlockMekApiaryFactory(deferredBlock.get(), machineItemProperties(deferredBlock.get())));
+			EM_APIARY_FACTORY_ITEMS.put(tier, deferredItem);
+		}
+	}
+
+	/**
+	 * 注册 EME 等级的蜂箱工厂 BlockItem
+	 * <br/>
+	 * 当 EvolvedMekanismExtras 加载时，委托 {@link EMECompatLoader#registerApiaryItems()}
+	 * 完成实际注册（避免主注册类编译期依赖 EME 类）。
+	 * 注册结果填充到 {@link #EME_APIARY_FACTORY_ITEMS}（通配类型）。
+	 * <p>
+	 * 调用时机：必须在 {@link ModBlocks#registerEMEApiaryFactories()} 之后、registerItem(eventBus) 之前调用。
+	 */
+	public static void registerEMEApiaryFactoryItems() {
+		if (!MekCompatHooks.isEvolvedMekanismExtrasLoaded()) {
+			return;
+		}
+		EMECompatLoader.registerApiaryItems();
+	}
+
+	/**
+	 * 创建机器BlockItem属性
+	 * <br/>
+	 * 1.20.1：无 DataComponent API（Item.Properties.component() 为 1.20.5+）。
+	 * 机器的弹出器/侧面配置/安全/红石/升级等数据由 TileEntity 侧组件
+	 * （TileComponentConfig/TileComponentUpgrade/TileComponentEjector 等）在放置时初始化，
+	 * 扳手拆卸时由 MEK 原生 blockRemoved 流程持久化到 ItemStack NBT，无需物品默认组件。
+	 */
+	public static Item.Properties machineItemProperties(net.minecraft.world.level.block.Block block) {
+		return new Item.Properties();
+	}
+}

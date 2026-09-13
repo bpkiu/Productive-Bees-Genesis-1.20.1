@@ -1,0 +1,26 @@
+{
+  "primaryColor": "#FFFFFF",
+  "secondaryColor": "#FFFFFF",
+  "tertiaryColor": "#FFFFFF",
+  "particleColor": "#FFFFFF",
+  "flowerItem": "productivebees:honey_treat",
+  "attributes": {
+    "weather_tolerance": 2,
+    "temper": 0,
+    "behavior": 2,
+    "endurance": 3,
+    "productivity": 3
+  },
+  "createComb": false,
+  "colorCycle": false,
+  "size": 1.2,
+  "speed": 0.6,
+  "attack": 20.0,
+  "breedingItem": "productivebees:honey_treat",
+  "breedingItemCount": 1,
+  "selfbreed": true,
+  "waterproof": true,
+  "fireproof": true,
+  "rarity": "legendary",
+  "glowColor": "#FFFFFF"
+}

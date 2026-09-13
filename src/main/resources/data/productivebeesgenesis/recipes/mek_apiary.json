@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"equipment","pattern":["RBR","ICI","RBR"],"key":{"R":{"item":"minecraft:redstone"},"B":{"item":"mekanism:basic_control_circuit"},"I":{"tag":"forge:ingots/steel"},"C":{"tag":"productivebees:advanced_beehives"}},"result":{"item":"productivebeesgenesis:mek_apiary","count":1},"conditions":[{"type":"forge:mod_loaded","modid":"mekanism"}]}

@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "productivebeesgenesis:mek_centrifuge",
+    "productivebeesgenesis:mek_apiary",
+    "productivebeesgenesis:basic_mek_apiary_factory",
+    "productivebeesgenesis:advanced_mek_apiary_factory",
+    "productivebeesgenesis:elite_mek_apiary_factory",
+    "productivebeesgenesis:ultimate_mek_apiary_factory",
+    "productivebeesgenesis:basic_mek_centrifuge_factory",
+    "productivebeesgenesis:advanced_mek_centrifuge_factory",
+    "productivebeesgenesis:elite_mek_centrifuge_factory",
+    "productivebeesgenesis:ultimate_mek_centrifuge_factory",
+    "productivebeesgenesis:infinitycreation_comb_block"
+  ]
+}
