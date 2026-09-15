@@ -1,0 +1,97 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Forge 1.20.1 build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      # 编译依赖不入库，CI 按固定来源获取（与 1.21.1 主线 build.yml 的做法一致）
+      - name: Restore development compile dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p libs
+          fetch() {
+            curl --fail --location --retry 3 --retry-all-errors "$1" --output "libs/$2"
+            test -s "libs/$2"
+          }
+          curse_maven() {
+            fetch "https://www.cursemaven.com/curse/maven/$1/$2/$1-$2.jar" "$3"
+          }
+
+          # Productive Bees 1.20.1-12.6.0，并从内嵌 jarjar 提取 ProductiveLib
+          curse_maven productivebees-377897 5566102 productivebees-1.20.1-12.6.0.jar
+          unzip -p libs/productivebees-1.20.1-12.6.0.jar \
+            META-INF/jarjar/productivelib-1.20.1-0.0.4.jar \
+            > libs/productivelib-1.20.1-0.0.4.jar
+          test -s libs/productivelib-1.20.1-0.0.4.jar
+
+          # Mekanism 1.20.1-10.4.16（Modrinth 官方源）
+          fetch 'https://cdn.modrinth.com/data/Ce6I4WUE/versions/uxe1WQp4/Mekanism-1.20.1-10.4.16.80.jar' \
+            Mekanism-1.20.1-10.4.16.80.jar
+          # Applied Energistics 2 1.20.1 Forge 15.4.10
+          fetch 'https://cdn.modrinth.com/data/XxWD5pD3/versions/7KVs6HMQ/appliedenergistics2-forge-15.4.10.jar' \
+            appliedenergistics2-forge-15.4.10.jar
+          # JEI 1.20.1 Forge 15.48.0.185（官方版，替代 JEIunofficial 15.48.0.182）
+          fetch 'https://cdn.modrinth.com/data/u6dRKJwZ/versions/TvllnAfz/jei-1.20.1-forge-15.48.0.185.jar' \
+            jei-1.20.1-forge-15.48.0.185.jar
+          # Jade 1.20.1 Forge 11.13.2
+          fetch 'https://cdn.modrinth.com/data/nvQzSEkH/versions/LecuGude/Jade-1.20.1-Forge-11.13.2.jar' \
+            Jade-1.20.1-Forge-11.13.2.jar
+          # KubeJS 1.20.1 Forge 2001.6.5-build.16 + Rhino 2001.2.3-build.10
+          fetch 'https://cdn.modrinth.com/data/umyGl7zF/versions/g5igndAv/kubejs-forge-2001.6.5-build.16.jar' \
+            kubejs-forge-2001.6.5-build.16.jar
+          fetch 'https://cdn.modrinth.com/data/sk9knFPE/versions/uNALdylI/rhino-forge-2001.2.3-build.10.jar' \
+            rhino-forge-2001.2.3-build.10.jar
+
+          # Mekanism Extras（通用机械：扩展）1.20.1-1.4.6
+          curse_maven mekanism-extras-1026040 6936409 mekanism_extras-1.20.1-1.4.6.jar
+          # Evolved Mekanism（通用机械：进化）1.20.1-1.2.1-fix4
+          curse_maven evolved-mekanism-1230085 7599591 EvolvedMekanism-1.20.1-1.2.1-fix4.jar
+          # Evolved Mekanism Extras 1.20.1-1.3.8
+          curse_maven evolved-mekanism-extras-1268159 8076395 EvolvedMekanismExtras-1.20.1-1.3.8.jar
+          # AppliedFlux 1.20.1 Forge 1.3.7
+          curse_maven applied-flux-965012 7651647 AppliedFlux-1.20-1.3.7-forge.jar
+          # JDTE 0.5.9-Fix（仅编译期引用，运行时按加载状态条件启用）
+          curse_maven jdte-1566414 8706482 jdte-0.5.9-Fix.jar
+
+      - name: Build
+        shell: bash
+        run: bash ./gradlew build --stacktrace
+
+      - name: Upload mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: productivebeesgenesis-forge-1.20.1
+          if-no-files-found: error
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-javadoc.jar
