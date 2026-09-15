@@ -151,10 +151,14 @@ repositories {
 }
 
 // ============================================================
-// 编译依赖统一放在项目 libs/ 目录（E 盘、gitignore 不入库）
-// 首次获取方式：参照 .github/workflows/build.yml 的依赖下载步骤
+// 编译依赖统一放在项目 libs/ 目录（不入库）
+// 获取方式：scripts/fetch-libs.ps1（Windows）或 scripts/fetch-libs.sh（Linux/macOS/CI）
 // （CurseMaven 直链 + Modrinth CDN + 从 PB jar 内嵌 jarjar 提取 ProductiveLib）
 // ============================================================
+// libs/ 缺失时的友好提示（CI 在构建前已由脚本填充，此提示仅面向本地开发者）
+if (!file('libs/productivebees-1.20.1-12.6.0.jar').exists()) {
+    logger.lifecycle('PBG: libs/ 缺少编译依赖。请先运行 scripts/fetch-libs.ps1（Windows）或 scripts/fetch-libs.sh（Linux/macOS）下载，详见 CHANGELOG.md。')
+}
 
 dependencies {
     // Specify the version of Minecraft to use.
