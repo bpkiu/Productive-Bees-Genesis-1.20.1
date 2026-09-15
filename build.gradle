@@ -1,7 +1,5 @@
 buildscript {
     repositories {
-        // BMCLAPI 国内镜像（完整镜像 maven.minecraftforge.net，加载 ForgeGradle/MixinGradle 插件）
-        maven { url = 'https://bmclapi2.bangbang93.com/maven' }
         maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
     }
     dependencies {
@@ -136,10 +134,13 @@ repositories {
     // Put repositories for dependencies here
     // ForgeGradle automatically adds the Forge maven and Maven Central for you
 
-    // BMCLAPI 国内镜像（FG 内部下载 forge userdev / MCPConfig 等工件时优先走这里）
-    maven {
-        name = 'BMCLAPI-MinecraftForge'
-        url = 'https://bmclapi2.bangbang93.com/maven'
+    // BMCLAPI 国内镜像（可选）：FG 内部下载 forge userdev / MCPConfig 等工件时优先走这里。
+    // 默认关闭（官方源），网络受限环境经 pbgChinaMirror=true 启用（见 settings.gradle 注释）
+    if (providers.gradleProperty('pbgChinaMirror').getOrElse('false').toBoolean()) {
+        maven {
+            name = 'BMCLAPI-MinecraftForge'
+            url = 'https://bmclapi2.bangbang93.com/maven'
+        }
     }
 
     // SpongePowered maven —— Mixin 注解处理器 (org.spongepowered:mixin:0.8.5:processor)

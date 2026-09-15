@@ -16,6 +16,7 @@
 ### 工程化
 
 - **编译依赖本地化**：移除对个人机器路径（`G:\versions\2\mods`、`C:\Users\XBX\...`）的硬编码引用，全部 13 个 1.20.1 Forge 编译依赖统一放入项目 `libs/`（不入库），由 CI 工作流按固定来源（CurseMaven / Modrinth）自动获取；ProductiveLib 1.20.1-0.0.4 从 Productive Bees jar 内嵌 jarjar 提取，与主线 1.21.1 CI 的做法一致。JEI 使用官方 15.48.0.185 替代原 JEIunofficial 15.48.0.182（API 兼容）。
+- **可选国内镜像**：BMCLAPI 镜像（maven.minecraftforge.net 的社区镜像）经 `pbgChinaMirror` 构建属性按需启用，默认关闭——仓库与 CI 默认始终使用官方源，不影响任何贡献者；网络受限环境在用户级 `~/.gradle/gradle.properties` 加 `pbgChinaMirror=true` 或单次构建加 `-PpbgChinaMirror=true` 启用。
 - **开发运行时依赖**：Productive Bees、Mekanism、Mekanism Extras、Evolved Mekanism、EME Extras、AE2、JEI、Jade、KubeJS、Rhino 同时声明为 `runtimeOnly`，`runClient` / `runServer` 可直接进行集成冒烟测试；AppFlux 与 JDTE 仍为纯编译期依赖（运行时按模组加载状态条件启用）。
 - **构建输出回归项目目录**：移除把构建输出重定向到系统临时目录（C 盘）的临时配置；Gradle 用户目录（`GRADLE_USER_HOME`）与 ForgeGradle 缓存全部位于 E 盘，不写入 C 盘。
 - **新增 CI 构建工作流**（`.github/workflows/build.yml`）：推送 / PR 触发 Java 17 + ForgeGradle 6 全量构建并上传产物。1.20.1 版本暂未发布 CurseForge，工作流不含自动发布步骤。

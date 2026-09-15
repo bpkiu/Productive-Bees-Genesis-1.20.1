@@ -1,9 +1,14 @@
 pluginManagement {
     repositories {
-        // BMCLAPI 国内镜像（完整镜像 maven.minecraftforge.net，下载 FG 插件与依赖）
-        maven {
-            name = 'BMCLAPI-MinecraftForge'
-            url = 'https://bmclapi2.bangbang93.com/maven'
+        // BMCLAPI 国内镜像（可选）：完整镜像 maven.minecraftforge.net。
+        // 默认关闭，保持官方源对 CI 与所有贡献者中立；
+        // 网络受限环境在用户级 ~/.gradle/gradle.properties 加 pbgChinaMirror=true 启用，
+        // 或单次构建加 -PpbgChinaMirror=true
+        if (providers.gradleProperty('pbgChinaMirror').getOrElse('false').toBoolean()) {
+            maven {
+                name = 'BMCLAPI-MinecraftForge'
+                url = 'https://bmclapi2.bangbang93.com/maven'
+            }
         }
         gradlePluginPortal()
         maven {
