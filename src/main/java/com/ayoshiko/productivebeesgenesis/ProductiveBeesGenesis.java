@@ -37,6 +37,8 @@ import com.ayoshiko.productivebeesgenesis.util.BeeRecipeReloader;
 import com.ayoshiko.productivebeesgenesis.util.CentrifugeRecipeIndex;
 import com.ayoshiko.productivebeesgenesis.util.LogThrottle;
 import com.ayoshiko.productivebeesgenesis.util.RecipeReloadRetryManager;
+import com.ayoshiko.productivebeesgenesis.util.ServerTickClock;
+import com.ayoshiko.productivebeesgenesis.util.SingleIngredientCraftingIndex;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -55,6 +57,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TagsUpdatedEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.server.ServerLifecycleHooks;
 // 注：原 import net.minecraftforge.capabilities.RegisterCapabilitiesEvent 已移除 — Forge 1.20.1 无此类
@@ -237,6 +240,10 @@ public final class ProductiveBeesGenesis {
 		// 维护最近 100 tick 滚动平均，暴露 getTpsFactor() 供所有节流逻辑使用
 		MinecraftForge.EVENT_BUS.addListener(ServerTickTimeMonitor.getInstance()::onTickPre);
 		MinecraftForge.EVENT_BUS.addListener(ServerTickTimeMonitor.getInstance()::onTickPost);
+		// 推进全局游戏刻时钟 — 槽位对象拿不到 Level，「外部退回窗口」靠它判断凭据是否过期
+		MinecraftForge.EVENT_BUS.addListener((TickEvent.ServerTickEvent event) -> {
+			if (event.phase == TickEvent.Phase.END) ServerTickClock.tick();
+		});
 		// 注册开发者模式命令 — /productivebeesgenesis dev on|off|status|<feature> on|off
 		// 使用内存状态而非配置文件，避免生产环境意外持久化
 		MinecraftForge.EVENT_BUS.addListener(this::onRegisterCommands);
@@ -269,6 +276,8 @@ public final class ProductiveBeesGenesis {
 		RawOreSmeltingUpgradeHelper.invalidateCache();
 		// 失效物品/方块转化配方索引（配方重载后转化原料花朵判定需重建）
 		BeeConversionQueries.invalidate();
+		// 失效单原料合成配方索引（染料蜜蜂花→染料查找，重载后首次查询重建）
+		SingleIngredientCraftingIndex.invalidate();
 		// 失效 PB 离心配方输出表缓存（防止 getRecipeOutputs 返回过期 LinkedHashMap）
 		PbRecipeCompleter.invalidateRecipeOutputsCache();
 		// 失效万象批量规划器模板缓存（标签重载后 bee_type 可能变化）（Task 19）
@@ -357,6 +366,8 @@ public final class ProductiveBeesGenesis {
 		safeClear(RawOreSmeltingUpgradeHelper::invalidateCache, "RawOreSmeltingUpgradeHelper");
 		// 清理物品/方块转化配方索引 — 防止跨存档残留旧 RecipeHolder 引用（与 onTagsReload 生命周期一致）
 		safeClear(BeeConversionQueries::invalidate, "BeeConversionQueries");
+		// 清理单原料合成配方索引 — 防止跨存档残留旧配方产物引用
+		safeClear(SingleIngredientCraftingIndex::invalidate, "SingleIngredientCraftingIndex");
 		safeClear(MyriadCreationsEventHandler::clearAllCaches, "MyriadCreationsEventHandler");
 		// 清理 BeeRecipeReloader 延迟重试上下文 — 防止持有的 RecipeManager 引用阻碍 GC
 	safeClear(RecipeReloadRetryManager::clearPendingRetryContext, "RecipeReloadRetryManager");
@@ -376,6 +387,8 @@ public final class ProductiveBeesGenesis {
 		}, "CombFuzzyMatcher.aeItemKeyToBeeTypeCache");
 		// 清理服务端 tick 时间监测器状态 — 防止跨存档 MSPT 样本与 tpsFactor 缓存残留
 		safeClear(ServerTickTimeMonitor.getInstance()::invalidate, "ServerTickTimeMonitor");
+		// 复位全局游戏刻时钟 — 槽位的「外部退回窗口」依赖它判定过期，跨存档必须归零
+		safeClear(ServerTickClock::reset, "ServerTickClock");
 		safeClear(LogThrottle::clearAll, "LogThrottle");
 	}
 
