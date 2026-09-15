@@ -72,6 +72,102 @@ description='''${mod_description}'''
     ordering="NONE"
     side="BOTH"
 
+# Productive Bees 本体（必需）
+[[dependencies.${mod_id}]]
+    modId="productivebees"
+    mandatory=true
+    versionRange="[1.20.1-12.6.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Mekanism 本体（必需）
+[[dependencies.${mod_id}]]
+    modId="mekanism"
+    mandatory=true
+    versionRange="[10.4.13,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Evolved Mekanism（通用机械：进化，可选）
+[[dependencies.${mod_id}]]
+    modId="evolvedmekanism"
+    mandatory=false
+    versionRange="[1.2.1,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Mekanism Extras（通用机械：扩展，可选）
+[[dependencies.${mod_id}]]
+    modId="mekanism_extras"
+    mandatory=false
+    versionRange="[1.4.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Evolved Mekanism Extras（EME Extras，可选）
+[[dependencies.${mod_id}]]
+    modId="emextras"
+    mandatory=false
+    versionRange="[1.3.8,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Applied Energistics 2（可选）
+[[dependencies.${mod_id}]]
+    modId="ae2"
+    mandatory=false
+    versionRange="[15.4.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Jade（可选，客户端）
+[[dependencies.${mod_id}]]
+    modId="jade"
+    mandatory=false
+    versionRange="[11.13.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
+# KubeJS（可选）
+[[dependencies.${mod_id}]]
+    modId="kubejs"
+    mandatory=false
+    versionRange="[2001.6.5-build.16,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# AppliedFlux（可选）
+[[dependencies.${mod_id}]]
+    modId="appflux"
+    mandatory=false
+    versionRange="[1.20-1.3.7,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# JEI（可选，客户端）
+[[dependencies.${mod_id}]]
+    modId="jei"
+    mandatory=false
+    versionRange="[15.0.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
+# JDTE（可选；运行时经 MixinConfigPlugin 按加载状态条件应用）
+[[dependencies.${mod_id}]]
+    modId="jdte"
+    mandatory=false
+    versionRange="[0.5.5,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Iris（可选，客户端；mixin 由 iris 配置的 plugin 按 Iris 安装状态条件应用）
+[[dependencies.${mod_id}]]
+    modId="iris"
+    mandatory=false
+    versionRange="[1.6.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

@@ -1,5 +1,7 @@
 buildscript {
     repositories {
+        // BMCLAPI 国内镜像（完整镜像 maven.minecraftforge.net，加载 ForgeGradle/MixinGradle 插件）
+        maven { url = 'https://bmclapi2.bangbang93.com/maven' }
         maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
     }
     dependencies {
@@ -20,9 +22,6 @@ apply plugin: 'org.spongepowered.mixin'
 
 version = mod_version
 group = mod_group_id
-
-// TEMP: redirect build output to temp dir to bypass sandbox restrictions (remove after migration)
-buildDir = file("${System.getProperty('java.io.tmpdir')}/pbg-build")
 
 base {
     archivesName = mod_id
@@ -137,91 +136,85 @@ repositories {
     // Put repositories for dependencies here
     // ForgeGradle automatically adds the Forge maven and Maven Central for you
 
+    // BMCLAPI 国内镜像（FG 内部下载 forge userdev / MCPConfig 等工件时优先走这里）
+    maven {
+        name = 'BMCLAPI-MinecraftForge'
+        url = 'https://bmclapi2.bangbang93.com/maven'
+    }
+
     // SpongePowered maven —— Mixin 注解处理器 (org.spongepowered:mixin:0.8.5:processor)
     maven {
         name = 'SpongePowered'
         url = 'https://repo.spongepowered.org/repository/maven-public/'
     }
-
-    // Curse Maven —— 用于拉取 productivebees / mekanism / jei / jade 等 1.20.1 依赖
-    // 使用 exclusiveContent 限定只解析 curse.maven 组，避免与其它仓库冲突
-    exclusiveContent {
-        forRepository {
-            maven {
-                url = 'https://cursemaven.com'
-            }
-        }
-        filter {
-            includeGroup 'curse.maven'
-        }
-    }
 }
 
 // ============================================================
-// 本地 mods 目录（G:\versions\2\mods）
-// 使用本地 jar 文件作为 compileOnly 依赖，避免 CurseMaven 网络下载问题
-// 所有 jar 均为 1.20.1 Forge 版本，从玩家本地 mods 文件夹直接引用
+// 编译依赖统一放在项目 libs/ 目录（E 盘、gitignore 不入库）
+// 首次获取方式：参照 .github/workflows/build.yml 的依赖下载步骤
+// （CurseMaven 直链 + Modrinth CDN + 从 PB jar 内嵌 jarjar 提取 ProductiveLib）
 // ============================================================
-def localModsDir = "G:\\versions\\2\\mods"
 
 dependencies {
     // Specify the version of Minecraft to use.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // ============================================================
-    // 核心 mod 依赖（1.20.1 Forge 本地 jar）
+    // 核心 mod 依赖（1.20.1 Forge）
     // ============================================================
 
     // Productive Bees 1.20.1 —— 12.6.0
-    compileOnly files("$localModsDir/productivebees-1.20.1-12.6.0.jar")
+    compileOnly files('libs/productivebees-1.20.1-12.6.0.jar')
+    runtimeOnly files('libs/productivebees-1.20.1-12.6.0.jar')
 
-    // Mekanism 1.20.1 —— 10.4.16（比 build.gradle 原本的 10.4.13 更新）
-    compileOnly files("$localModsDir/Mekanism-1.20.1-10.4.16-all.jar")
+    // Mekanism 1.20.1 —— 10.4.16
+    compileOnly files('libs/Mekanism-1.20.1-10.4.16.80.jar')
+    runtimeOnly files('libs/Mekanism-1.20.1-10.4.16.80.jar')
 
     // Applied Energistics 2 (AE2) 1.20.1 Forge —— 15.4.10
-    compileOnly files("$localModsDir/appliedenergistics2-forge-15.4.10.jar")
+    compileOnly files('libs/appliedenergistics2-forge-15.4.10.jar')
+    runtimeOnly files('libs/appliedenergistics2-forge-15.4.10.jar')
 
-    // Just Enough Items (JEI) 1.20.1 Forge —— 15.48.0.182（本地为 JEIunofficial 构建）
-    compileOnly files("$localModsDir/JEIunofficial-1.20.1-forge-15.48.0.182.jar")
+    // JEI 1.20.1 Forge —— 15.48.0.185（官方版，替代原移植所用的 JEIunofficial 15.48.0.182）
+    compileOnly files('libs/jei-1.20.1-forge-15.48.0.185.jar')
+    runtimeOnly files('libs/jei-1.20.1-forge-15.48.0.185.jar')
 
     // Jade 1.20.1 Forge —— 11.13.2
-    compileOnly files("$localModsDir/Jade-1.20.1-Forge-11.13.2.jar")
+    compileOnly files('libs/Jade-1.20.1-Forge-11.13.2.jar')
+    runtimeOnly files('libs/Jade-1.20.1-Forge-11.13.2.jar')
 
     // ============================================================
-    // 第三方扩展 mod 依赖（1.20.1 Forge 本地 jar）
-    // 这些 mod 是可选兼容目标，源码通过反射或 mixin 引用
+    // 第三方扩展 mod 依赖（可选兼容目标，源码通过反射或 mixin 引用）
     // ============================================================
 
     // Mekanism Extras（通用机械：扩展）1.20.1 —— 1.4.6
-    // 实际包名: com.jerry.mekanism_extras
-    compileOnly files("$localModsDir/[通用机械：扩展] mekanism_extras-1.20.1-1.4.6.jar")
+    compileOnly files('libs/mekanism_extras-1.20.1-1.4.6.jar')
+    runtimeOnly files('libs/mekanism_extras-1.20.1-1.4.6.jar')
 
     // Evolved Mekanism（通用机械：进化）1.20.1 —— 1.2.1-fix4
-    // 实际包名: fr.iglee42.evolvedmekanism
-    compileOnly files("$localModsDir/[通用机械：进化] Evolved Mekanism-1.20.1-1.2.1-fix4.jar")
+    compileOnly files('libs/EvolvedMekanism-1.20.1-1.2.1-fix4.jar')
+    runtimeOnly files('libs/EvolvedMekanism-1.20.1-1.2.1-fix4.jar')
 
     // Evolved Mekanism Extras (EME Extras) 1.20.1 —— 1.3.8
-    // 实际包名: io.github.masyumero.emextras
-    compileOnly files("$localModsDir/EvolvedMekanismExtras-1.20.1-1.3.8.jar")
+    compileOnly files('libs/EvolvedMekanismExtras-1.20.1-1.3.8.jar')
+    runtimeOnly files('libs/EvolvedMekanismExtras-1.20.1-1.3.8.jar')
 
-    // AppFlux 1.20.1 Forge —— 1.3.7
-    // 实际包名: com.glodblock.github.appflux
-    compileOnly files("$localModsDir/AppliedFlux-1.20-1.3.7-forge.jar")
+    // AppFlux 1.20.1 Forge —— 1.3.7（未安装时 extractAppliedFluxFe 入口直接返回，不触发类加载）
+    compileOnly files('libs/AppliedFlux-1.20-1.3.7-forge.jar')
 
-    // JDTE 1.20.1 —— 0.5.9-Fix（注意：源码原本针对 1.21.1，1.20.1 版本可能不存在）
-    // 实际包名: com.jdte
-    compileOnly files("$localModsDir/jdte-0.5.9-Fix.jar")
+    // JDTE —— 0.5.9-Fix（可选联动：CoalescedAcceleratedMachine 合并接口，仅编译期引用；
+    // 运行时经 MixinConfigPlugin 按模组加载状态条件应用）
+    compileOnly files('libs/jdte-0.5.9-Fix.jar')
 
     // KubeJS 1.20.1 Forge —— 2001.6.5-build.16
-    // 实际包名: dev.latvian.mods.kubejs
-    compileOnly files("$localModsDir/kubejs-forge-2001.6.5-build.16.jar")
+    compileOnly files('libs/kubejs-forge-2001.6.5-build.16.jar')
+    runtimeOnly files('libs/kubejs-forge-2001.6.5-build.16.jar')
 
     // Rhino（KubeJS 依赖）1.20.1 Forge —— 2001.2.3-build.10
-    compileOnly files("$localModsDir/rhino-forge-2001.2.3-build.10.jar")
+    compileOnly files('libs/rhino-forge-2001.2.3-build.10.jar')
+    runtimeOnly files('libs/rhino-forge-2001.2.3-build.10.jar')
 
     // MixinExtras（Mixin 增强工具，源码使用 WrapOperation/ModifyExpressionValue）
-    // Forge 1.20.1 的 ForgeGradle 会自动引入 mixinextras 到运行时 classpath，
-    // 但 compileOnly 需要单独声明
     compileOnly "io.github.llamalad7:mixinextras-common:0.3.5"
     annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.5"
 
@@ -229,14 +222,10 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     // ProductiveLib 1.20.1 —— 0.0.4（cy.jdkdigital.productivelib）
-    // 注意：PB 1.20.1 并未将 ProductiveLib 合并进本体，而是以 jar-in-jar 形式内嵌
-    // （META-INF/jarjar/productivelib-1.20.1-0.0.4.jar）。运行时由 Forge 自动解包加载，
-    // 但编译期不在类路径上——引用 AdvancedBeehiveBlockEntity 等实现类的成员时，
-    // javac 需要补全其 implements 的 UpgradeableBlockEntity 接口，缺失会报
-    // "无法访问UpgradeableBlockEntity / 找不到类文件"。
-    // 该 jar 已从 PB jar 内嵌包提取到 gradle 缓存目录（勿放入游戏 mods 目录，
-    // 否则运行时会与 PB 的 jar-in-jar 双重加载）：
-    compileOnly files("C:\\Users\\XBX\\.gradle\\caches\\pbg_local\\productivelib-1.20.1-0.0.4.jar")
+    // 注意：PB 1.20.1 以 jar-in-jar 形式内嵌运行时由 Forge 自动加载，
+    // 这里仅补编译类路径（AdvancedBeehiveBlockEntity 实现的接口定义）。
+    // 已从 PB jar 的 META-INF/jarjar/ 提取到 libs/，勿放入游戏 mods 目录。
+    compileOnly files('libs/productivelib-1.20.1-0.0.4.jar')
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -280,7 +269,8 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Vendor'   : mod_authors,
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
                 // Forge 生产环境加载 Mixin 配置的必需清单属性（缺失会导致 ClassCastException）
-                'MixinConfigs'            : "${mod_id}.mixins.json"
+                    // 主配置 + Iris 光影兼容配置（iris 配置由其 plugin 按 Iris 安装状态条件应用）
+                    'MixinConfigs'            : "${mod_id}.mixins.json,${mod_id}.iris.mixins.json"
         ])
     }
 

@@ -27,3 +27,6 @@ forge*changelog.txt
 # build output
 run-data
 dist
+
+# 编译依赖 jar（由 CI 或本地下游脚本获取，见 .github/workflows/build.yml）
+libs/

@@ -1,5 +1,10 @@
 pluginManagement {
     repositories {
+        // BMCLAPI 国内镜像（完整镜像 maven.minecraftforge.net，下载 FG 插件与依赖）
+        maven {
+            name = 'BMCLAPI-MinecraftForge'
+            url = 'https://bmclapi2.bangbang93.com/maven'
+        }
         gradlePluginPortal()
         maven {
             name = 'MinecraftForge'
