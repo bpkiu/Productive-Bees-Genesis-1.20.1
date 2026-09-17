@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "HGH",
+    "GUG",
+    "HGH"
+  ],
+  "key": {
+    "H": {
+      "item": "productivebees:honey_treat"
+    },
+    "G": {
+      "item": "minecraft:glowstone"
+    },
+    "U": {
+      "item": "productivebees:upgrade_base"
+    }
+  },
+  "result": {
+    "item": "productivebeesgenesis:gene_full_purity_upgrade",
+    "count": 1
+  }
+}

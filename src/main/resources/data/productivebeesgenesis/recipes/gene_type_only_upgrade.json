@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "HRH",
+    "RUR",
+    "HRH"
+  ],
+  "key": {
+    "H": {
+      "item": "productivebees:honey_treat"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "U": {
+      "item": "productivebees:upgrade_base"
+    }
+  },
+  "result": {
+    "item": "productivebeesgenesis:gene_type_only_upgrade",
+    "count": 1
+  }
+}

@@ -10,6 +10,8 @@ import com.ayoshiko.productivebeesgenesis.compat.mekanism_extras.MECompatLoader;
 import com.ayoshiko.productivebeesgenesis.item.ItemInfinityCreationComb;
 import com.ayoshiko.productivebeesgenesis.item.ItemInfinityCreationCombBlock;
 import com.ayoshiko.productivebeesgenesis.item.EssenceConversionUpgradeItem;
+import com.ayoshiko.productivebeesgenesis.item.GeneFullPurityUpgradeItem;
+import com.ayoshiko.productivebeesgenesis.item.GeneTypeOnlyUpgradeItem;
 import com.ayoshiko.productivebeesgenesis.item.RawOreSmeltingUpgradeItem;
 import com.ayoshiko.productivebeesgenesis.item.UselessByproductUpgradeItem;
 import com.ayoshiko.productivebeesgenesis.mek.ItemBlockMekCentrifuge;
@@ -149,6 +151,16 @@ public final class ModItems {
 	public static final RegistryObject<RawOreSmeltingUpgradeItem> RAW_ORE_SMELTING_UPGRADE =
 			registerItem("raw_ore_smelting_upgrade",
 					() -> new RawOreSmeltingUpgradeItem(new Item.Properties()));
+
+	/** Gene type-only upgrade — sampler outputs TYPE genes only (functional, apiary-only) */
+	public static final RegistryObject<GeneTypeOnlyUpgradeItem> GENE_TYPE_ONLY_UPGRADE =
+			registerItem("gene_type_only_upgrade",
+					() -> new GeneTypeOnlyUpgradeItem(new Item.Properties()));
+
+	/** Gene full-purity upgrade — sampler purity locked to 4 (functional, apiary-only) */
+	public static final RegistryObject<GeneFullPurityUpgradeItem> GENE_FULL_PURITY_UPGRADE =
+			registerItem("gene_full_purity_upgrade",
+					() -> new GeneFullPurityUpgradeItem(new Item.Properties()));
 
 	/**
 	 * EM工厂BlockItem映射 — 由registerEMFactoryItems()在EM加载时填充

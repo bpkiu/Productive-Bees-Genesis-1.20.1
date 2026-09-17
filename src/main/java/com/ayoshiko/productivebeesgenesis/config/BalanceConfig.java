@@ -9,19 +9,19 @@ import java.util.Map;
 public final class BalanceConfig {
 
 	static final BalancePreset DEFAULT_PRESET = BalancePreset.BASIC;
-	static final boolean DEFAULT_CUSTOM_PRODUCTIVITY_EXCLUSIVE = true;
+	static final boolean DEFAULT_CUSTOM_PRODUCTIVITY_EXCLUSIVE = false;
 	static final boolean DEFAULT_CUSTOM_SPEED_EXCLUSIVE = true;
 	static final boolean DEFAULT_CUSTOM_CENTRIFUGE_OUTPUT = false;
 	static final boolean DEFAULT_CUSTOM_APIARY_BEE_GENES_AFFECT_WORK = true;
-	static final int DEFAULT_CONFIGURED_PB_UPGRADE_LIMIT = 4;
+	static final int DEFAULT_CONFIGURED_PB_UPGRADE_LIMIT = 32;
 	static final int DEFAULT_CONFIGURED_STACK_UPGRADE_LIMIT = 8;
 	static final boolean LEGACY_PRODUCTIVITY_EXCLUSIVE = false;
 	static final boolean LEGACY_SPEED_EXCLUSIVE = false;
 	static final boolean LEGACY_CENTRIFUGE_OUTPUT = true;
 	static final boolean LEGACY_APIARY_BEE_GENES_AFFECT_WORK = false;
 
-	private static final int BASIC_PB_UPGRADE_LIMIT = 4;
-	static final int LEGACY_PB_UPGRADE_LIMIT = 8;
+	private static final int BASIC_PB_UPGRADE_LIMIT = 32;
+	static final int LEGACY_PB_UPGRADE_LIMIT = 32;
 	private static final int BASIC_STACK_UPGRADE_LIMIT = 8;
 	static final int LEGACY_STACK_UPGRADE_LIMIT = 16;
 
@@ -314,7 +314,7 @@ public final class BalanceConfig {
 			boolean apiaryBeeGenesAffectWork) {
 
 		static Rules basic() {
-			return new Rules(BalancePreset.BASIC, true, true, false, true);
+			return new Rules(BalancePreset.BASIC, false, true, false, true);
 		}
 
 		static Rules paradoxInfinity() {
