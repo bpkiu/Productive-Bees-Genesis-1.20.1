@@ -1119,5 +1119,15 @@
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.myriad_creations_filter":  "万象创世过滤",
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.myriad_creations_filter.title":  "万象创世过滤",
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance":  "平衡性规则",
-    "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance.title":  "平衡性规则"
+    "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance.title":  "平衡性规则",
+    "item.productivebeesgenesis.gene_type_only_upgrade":  "基因类型专用升级",
+    "item.productivebeesgenesis.gene_type_only_upgrade.description.effect":  "蜂箱：基因采样器仅产出 TYPE 基因，跳过属性基因（产量/耐力/性情/行为/天气耐受）",
+    "item.productivebeesgenesis.gene_type_only_upgrade.description.limit":  "每台机器最多安装 1 个；需已安装基因采样器",
+    "item.productivebeesgenesis.gene_full_purity_upgrade":  "基因满纯度升级",
+    "item.productivebeesgenesis.gene_full_purity_upgrade.description.effect":  "蜂箱：基因采样器产出纯度固定为 4（最大），不再随机 1-4",
+    "item.productivebeesgenesis.gene_full_purity_upgrade.description.limit":  "每台机器最多安装 1 个；需已安装基因采样器",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_type_only":  "基因类型专用",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_type_only.desc":  "基因采样器仅产出 TYPE 基因，跳过属性基因",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_full_purity":  "基因满纯度",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_full_purity.desc":  "基因采样器产出纯度固定为 4（最大）"
 }

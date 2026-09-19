@@ -80,7 +80,8 @@ public class GeneSampler {
 	 * @return 基因物品列表（可能为空，未命中时返回空列表）
 	 */
 	public List<ItemStack> generateGeneSamples(ResourceLocation beeTypeKey, int produceCount,
-			int samplerCount, Level level, CompoundTag beeData) {
+			int samplerCount, Level level, CompoundTag beeData,
+			boolean typeOnly, boolean fullPurity) {
 		if (beeTypeKey == null || produceCount <= 0 || level == null || samplerCount <= 0) {
 			return List.of();
 		}
@@ -98,7 +99,11 @@ public class GeneSampler {
 			// 正常场景：独立伯努利判定，保留完整随机性
 			for (int i = 0; i < produceCount; i++) {
 				if (random.nextFloat() <= chance) {
-					purityCounts[random.nextInt(4)]++;
+					if (fullPurity) {
+						purityCounts[3]++; // 固定纯度 4（最大）
+					} else {
+						purityCounts[random.nextInt(4)]++;
+					}
 				}
 			}
 		} else {
@@ -112,12 +117,17 @@ public class GeneSampler {
 			double z = Math.sqrt(-2.0 * Math.log(u1 + 1e-10)) * Math.cos(2.0 * Math.PI * u2);
 			long roundedHits = Math.round(expectedHits + z * stddev);
 			int hitCount = (int) Math.min(produceCount, Math.max(0L, roundedHits));
-			int perPurity = hitCount / purityCounts.length;
-			Arrays.fill(purityCounts, perPurity);
-			int remainder = hitCount % purityCounts.length;
-			int purityStart = random.nextInt(purityCounts.length);
-			for (int i = 0; i < remainder; i++) {
-				purityCounts[(purityStart + i) % purityCounts.length]++;
+			if (fullPurity) {
+				// 固定纯度 4：所有命中归入 purityCounts[3]
+				purityCounts[3] = hitCount;
+			} else {
+				int perPurity = hitCount / purityCounts.length;
+				Arrays.fill(purityCounts, perPurity);
+				int remainder = hitCount % purityCounts.length;
+				int purityStart = random.nextInt(purityCounts.length);
+				for (int i = 0; i < remainder; i++) {
+					purityCounts[(purityStart + i) % purityCounts.length]++;
+				}
 			}
 		}
 
@@ -142,13 +152,16 @@ public class GeneSampler {
 			genes.add(gene);
 		}
 		// 2) 属性基因（生产力/耐力/性情/行为/天气耐受）— 值来自蜜蜂真实 NBT
-		for (BeeAttribute<Integer> attr : attributes) {
-			int value = profile.value(attr);
-			for (int purityIndex = 0; purityIndex < purityCounts.length; purityIndex++) {
-				int count = purityCounts[purityIndex];
-				if (count <= 0) continue;
-				ItemStack gene = Gene.getStack(attr, value, count, purityIndex + 1);
-				genes.add(gene);
+		// typeOnly=true 时跳过属性基因生成，仅保留 TYPE 基因
+		if (!typeOnly) {
+			for (BeeAttribute<Integer> attr : attributes) {
+				int value = profile.value(attr);
+				for (int purityIndex = 0; purityIndex < purityCounts.length; purityIndex++) {
+					int count = purityCounts[purityIndex];
+					if (count <= 0) continue;
+					ItemStack gene = Gene.getStack(attr, value, count, purityIndex + 1);
+					genes.add(gene);
+				}
 			}
 		}
 		return genes;

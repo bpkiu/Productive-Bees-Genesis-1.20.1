@@ -268,7 +268,8 @@ public class BeeProduceProcessor {
 				&& upgradeHandler.hasGeneSamplerUpgrade()) {
 			List<ItemStack> geneStacks = geneSampler.generateGeneSamples(
 					beeTypeKey, SaturatingMath.saturatingToInt(totalProduceCount),
-					upgradeHandler.getGeneSamplerCount(), level, beeData);
+					upgradeHandler.getGeneSamplerCount(), level, beeData,
+					upgradeHandler.geneTypeOnly(), upgradeHandler.geneFullPurity());
 			if (!geneStacks.isEmpty()) {
 				allItems.addAll(geneStacks);
 			}

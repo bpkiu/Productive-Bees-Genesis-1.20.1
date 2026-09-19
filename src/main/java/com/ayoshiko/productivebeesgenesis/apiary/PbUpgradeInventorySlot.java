@@ -165,7 +165,9 @@ public class PbUpgradeInventorySlot extends BasicInventorySlot {
 				|| item == cy.jdkdigital.productivebees.init.ModItems.UPGRADE_TIME.get()
 				|| item == cy.jdkdigital.productivebees.init.ModItems.UPGRADE_BEE_SAMPLER.get()
 				|| item == cy.jdkdigital.productivebees.init.ModItems.UPGRADE_COMB_BLOCK.get()
-				|| item == ModItems.BYPRODUCT_DESTRUCTION_UPGRADE.get();
+				|| item == ModItems.BYPRODUCT_DESTRUCTION_UPGRADE.get()
+				|| item == ModItems.GENE_TYPE_ONLY_UPGRADE.get()
+				|| item == ModItems.GENE_FULL_PURITY_UPGRADE.get();
 	}
 
 	/**
@@ -214,6 +216,12 @@ public class PbUpgradeInventorySlot extends BasicInventorySlot {
 		if (item == ModItems.BYPRODUCT_DESTRUCTION_UPGRADE.get()) {
 			return PbUpgradeType.USELESS_BYPRODUCT;
 		}
+		if (item == ModItems.GENE_TYPE_ONLY_UPGRADE.get()) {
+			return PbUpgradeType.GENE_TYPE_ONLY;
+		}
+		if (item == ModItems.GENE_FULL_PURITY_UPGRADE.get()) {
+			return PbUpgradeType.GENE_FULL_PURITY;
+		}
 		return null;
 	}
 
@@ -239,6 +247,8 @@ public class PbUpgradeInventorySlot extends BasicInventorySlot {
 			case SIMULATION -> new ItemStack(cy.jdkdigital.productivebees.init.ModItems.UPGRADE_SIMULATOR.get());
 			case STABILITY -> new ItemStack(net.minecraft.world.item.Items.AIR);
 			case USELESS_BYPRODUCT -> new ItemStack(ModItems.BYPRODUCT_DESTRUCTION_UPGRADE.get());
+			case GENE_TYPE_ONLY -> new ItemStack(ModItems.GENE_TYPE_ONLY_UPGRADE.get());
+			case GENE_FULL_PURITY -> new ItemStack(ModItems.GENE_FULL_PURITY_UPGRADE.get());
 			default -> ItemStack.EMPTY;
 		};
 	}
@@ -268,6 +278,8 @@ public class PbUpgradeInventorySlot extends BasicInventorySlot {
 			case SIMULATION -> item == cy.jdkdigital.productivebees.init.ModItems.UPGRADE_SIMULATOR.get();
 			case STABILITY -> item == net.minecraft.world.item.Items.AIR;
 			case USELESS_BYPRODUCT -> item == ModItems.BYPRODUCT_DESTRUCTION_UPGRADE.get();
+			case GENE_TYPE_ONLY -> item == ModItems.GENE_TYPE_ONLY_UPGRADE.get();
+			case GENE_FULL_PURITY -> item == ModItems.GENE_FULL_PURITY_UPGRADE.get();
 			default -> false;
 		};
 	}

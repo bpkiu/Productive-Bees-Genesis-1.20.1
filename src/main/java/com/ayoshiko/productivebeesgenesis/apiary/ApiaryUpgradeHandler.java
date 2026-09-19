@@ -458,4 +458,28 @@ public class ApiaryUpgradeHandler {
 	boolean computeHasGeneSamplerUpgrade() {
 		return computeGeneSamplerCount() > 0;
 	}
+
+	/**
+	 * 是否安装了基因类型专用升级（GENE_TYPE_ONLY）
+	 * <br/>
+	 * 安装后基因采样器仅生成 TYPE 基因，跳过属性基因。
+	 * 功能型升级，1 个即满，不走缓存（按批次调用频率低）。
+	 *
+	 * @return true 如果已安装基因类型专用升级
+	 */
+	public boolean geneTypeOnly() {
+		return getInstalledUpgrades(PbUpgradeType.GENE_TYPE_ONLY) > 0;
+	}
+
+	/**
+	 * 是否安装了基因满纯度升级（GENE_FULL_PURITY）
+	 * <br/>
+	 * 安装后基因采样器固定输出纯度 4（最大），不再随机 1-4。
+	 * 功能型升级，1 个即满，不走缓存（按批次调用频率低）。
+	 *
+	 * @return true 如果已安装基因满纯度升级
+	 */
+	public boolean geneFullPurity() {
+		return getInstalledUpgrades(PbUpgradeType.GENE_FULL_PURITY) > 0;
+	}
 }

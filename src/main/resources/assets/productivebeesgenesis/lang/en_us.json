@@ -1119,5 +1119,15 @@
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.myriad_creations_filter":  "Myriad Creations Filter",
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.myriad_creations_filter.title":  "Myriad Creations Filter",
     "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance":  "Balance Rules",
-    "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance.title":  "Balance Rules"
+    "productivebeesgenesis.configuration.section.productivebeesgenesis.gameplay.server.toml.balance.title":  "Balance Rules",
+    "item.productivebeesgenesis.gene_type_only_upgrade":  "Upgrade: Gene Type-Only",
+    "item.productivebeesgenesis.gene_type_only_upgrade.description.effect":  "Apiaries: gene sampler outputs TYPE genes only, skipping attribute genes (productivity/endurance/temper/behavior/weather-tolerance)",
+    "item.productivebeesgenesis.gene_type_only_upgrade.description.limit":  "Maximum one per machine; requires a gene sampler installed",
+    "item.productivebeesgenesis.gene_full_purity_upgrade":  "Upgrade: Gene Full Purity",
+    "item.productivebeesgenesis.gene_full_purity_upgrade.description.effect":  "Apiaries: gene sampler output purity is locked to 4 (maximum) instead of random 1-4",
+    "item.productivebeesgenesis.gene_full_purity_upgrade.description.limit":  "Maximum one per machine; requires a gene sampler installed",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_type_only":  "Gene Type-Only",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_type_only.desc":  "Restricts the gene sampler to TYPE genes only, skipping attribute genes",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_full_purity":  "Gene Full Purity",
+    "gui.productivebeesgenesis.pb_upgrade.type.gene_full_purity.desc":  "Locks gene sampler output purity to 4 (maximum)"
 }
