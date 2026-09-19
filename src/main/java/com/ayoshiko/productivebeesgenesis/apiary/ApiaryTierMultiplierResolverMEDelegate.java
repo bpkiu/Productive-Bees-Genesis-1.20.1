@@ -1,24 +1,32 @@
 package com.ayoshiko.productivebeesgenesis.apiary;
 
 import com.ayoshiko.productivebeesgenesis.compat.mekanism_extras.TileEntityExtraMekApiaryFactory;
-import com.ayoshiko.productivebeesgenesis.config.ModConfig;
+import com.ayoshiko.productivebeesgenesis.config.FactoryTierConfigService;
+import com.ayoshiko.productivebeesgenesis.config.FactoryTierKey;
 import com.jerry.mekanism_extras.common.tier.AdvancedFactoryTier;
 
 import java.util.Optional;
 import java.util.function.IntSupplier;
 
 /**
-	 * ME 蜂箱等级堆叠倍率解析器（隔离类）
-	 * <br/>
-	 * 集中引用 ME 可选依赖（{@link AdvancedFactoryTier}），仅在 {@code mekanism_extras} 模组加载后
-	 * 由 {@link ApiaryTierMultiplierResolver} 通过模组守卫调用，避免 ME 未加载时触发
-	 * {@code NoClassDefFoundError}。
-	 *
-	 * @since 2.0.0
-	 */
+ * ME 蜂箱等级堆叠倍率解析器（隔离类）
+ * <br/>
+ * 集中引用 ME 可选依赖（{@link AdvancedFactoryTier}），仅在 {@code mekanism_extras} 模组
+ * 加载后由 {@link ApiaryTierMultiplierResolver} 通过模组守卫调用，避免 ME 未加载时触发
+ * {@code NoClassDefFoundError}。
+ * <p>
+ * 隔离原理：JVM 延迟类加载，本类的 import 只有在调用方通过守卫后才会被解析，
+ * 从而避免 ME 未安装时类加载失败。
+ *
+ * @since 2.0.0
+ */
 final class ApiaryTierMultiplierResolverMEDelegate {
 
 	private ApiaryTierMultiplierResolverMEDelegate() {
+	}
+
+	private static IntSupplier supplier(FactoryTierKey tier) {
+		return () -> FactoryTierConfigService.current().apiaryOutputStack(tier);
 	}
 
 	/**
@@ -36,18 +44,13 @@ final class ApiaryTierMultiplierResolverMEDelegate {
 		AdvancedFactoryTier t = me.getMETier();
 		if (t != null) {
 			return Optional.of(switch (t) {
-				case ABSOLUTE -> () -> configStackValue(() -> ModConfig.SERVER.apiaryStackMeAbsolute.get());
-				case SUPREME -> () -> configStackValue(() -> ModConfig.SERVER.apiaryStackMeSupreme.get());
-				case COSMIC -> () -> configStackValue(() -> ModConfig.SERVER.apiaryStackMeCosmic.get());
-				case INFINITE -> () -> configStackValue(() -> ModConfig.SERVER.apiaryStackMeInfinite.get());
-				default -> () -> configStackValue(() -> ModConfig.SERVER.apiaryStackBasic.get());
+				case ABSOLUTE -> supplier(FactoryTierKey.ME_ABSOLUTE);
+				case SUPREME -> supplier(FactoryTierKey.ME_SUPREME);
+				case COSMIC -> supplier(FactoryTierKey.ME_COSMIC);
+				case INFINITE -> supplier(FactoryTierKey.ME_INFINITE);
+				default -> supplier(FactoryTierKey.BASIC);
 			});
 		}
-		return Optional.of(() -> configStackValue(() -> ModConfig.SERVER.apiaryStackBasic.get()));
-	}
-
-	private static int configStackValue(IntSupplier source) {
-		if (ModConfig.SERVER == null) return 1;
-		return source.getAsInt();
+		return Optional.of(supplier(FactoryTierKey.BASIC));
 	}
 }

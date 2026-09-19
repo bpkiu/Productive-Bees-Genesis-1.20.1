@@ -1,5 +1,7 @@
 package com.ayoshiko.productivebeesgenesis.mek;
 
+import com.ayoshiko.productivebeesgenesis.config.FactoryTierConfigService;
+import com.ayoshiko.productivebeesgenesis.config.FactoryTierKey;
 import com.ayoshiko.productivebeesgenesis.config.ModConfig;
 import com.ayoshiko.productivebeesgenesis.inventory.CentrifugeInputStackMultipliers;
 import com.ayoshiko.productivebeesgenesis.inventory.TieredInputSlot;
@@ -184,15 +186,14 @@ class MekCentrifugeSlotManager {
 	/**
 	 * 获取基础版离心机的堆叠倍率供应商
 	 * <br/>
-	 * 基础版离心机使用 {@code mekCentrifugeStackBasic} 配置值(通过子段访问)。
+	 * 基础版离心机使用输出槽倍率配置中的 BASIC 值（经 FactoryTierConfigService 快照读取）。
 	 * 工厂版离心机（TileEntityMekCentrifugeFactory 等）有自己的 addSlots() 实现，
 	 * 不使用本管理器，其堆叠倍率需在各工厂子类中独立实现。
 	 *
 	 * @return 堆叠倍率供应商，传入 TieredOutputInventorySlot
 	 */
 	private IntSupplier getStackMultiplierForTier() {
-		// v2.0.0 子段抽取后,通过 centrifuge().stackMultiplier 访问
-		return () -> ModConfig.SERVER.centrifuge().stackMultiplier.mekCentrifugeStackBasic.get();
+		return () -> FactoryTierConfigService.current().centrifugeOutputStack(FactoryTierKey.BASIC);
 	}
 
 	/**

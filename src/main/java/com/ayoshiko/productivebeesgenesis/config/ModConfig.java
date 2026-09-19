@@ -8,30 +8,37 @@ import org.slf4j.LoggerFactory;
 import java.util.Set;
 
 /**
-	 * 模组配置文件入口 — 万象创世蜜蜂属性覆盖
-	 * <p>
-	 * 允许整合包作者通过配置文件修改蜜蜂属性，无需编辑数据包JSON。
-	 * 客户端配置（CLIENT）仅影响本地渲染/显示；服务端配置（SERVER）按存档生效，
-	 * 世界加载时自动生效，无需执行 /reload。
-	 * <p>
-	 * <b>职责拆分（Task 21）</b>：原文件 551 行，已将三类配置抽取为独立顶级类，
-	 * 本类作为聚合入口持有三个 {@link ForgeConfigSpec} 与配置实例：
-	 * <ul>
-	 *   <li>{@link ClientConfig} — 客户端渲染/显示配置</li>
-	 *   <li>{@link CommonConfig} — 跨端同步配置</li>
-	 *   <li>{@link ServerConfig} — 存档级别配置</li>
-	 * </ul>
-	 * 外部访问路径 {@code ModConfig.CLIENT.xxx} / {@code ModConfig.SERVER.xxx} 保持不变。
-	 * <p>
-	 * 本类同时保留配置校验逻辑（validator 与跨字段联合校验），作为配置文件 validator
-	 * 与网络包服务端校验逻辑的单一来源（SRP）。
-	 */
+ * 模组配置文件入口 — 万象创世蜜蜂属性覆盖
+ * <p>
+ * 允许整合包作者通过配置文件修改蜜蜂属性，无需编辑数据包JSON。
+ * 客户端配置（CLIENT）仅影响本地渲染/显示；服务端配置（SERVER）按存档生效，
+ * 世界加载时自动生效，无需执行 /reload。
+ * <p>
+ * <b>职责拆分（Task 21）</b>：原文件 551 行，已将三类配置抽取为独立顶级类，
+ * 本类作为聚合入口持有全部 {@link ForgeConfigSpec} 与配置实例：
+ * <ul>
+ *   <li>{@link ClientConfig} — 客户端渲染/显示配置</li>
+ *   <li>{@link CommonConfig} — 跨端同步配置</li>
+ *   <li>{@link ServerConfig} — 存档级别配置（1.0.7 拆分为 gameplay/machines/capacities 三文件）</li>
+ * </ul>
+ * 外部访问路径 {@code ModConfig.CLIENT.xxx} / {@code ModConfig.SERVER.xxx} 保持不变。
+ * <p>
+ * <b>1.0.7 服务端三文件拆分</b>：单文件 {@code productivebeesgenesis-server.toml} 由
+ * {@link ServerConfigMigrationService} 事务式迁移为：
+ * <ul>
+ *   <li>{@link #GAMEPLAY_SERVER_SPEC} — 蜜蜂玩法/平衡/过滤</li>
+ *   <li>{@link #MACHINES_SERVER_SPEC} — 离心机/蜂箱机器参数</li>
+ *   <li>{@link #CAPACITIES_SERVER_SPEC} — 容量矩阵（数组化）</li>
+ * </ul>
+ * 本类同时保留配置校验逻辑（validator 与跨字段联合校验），作为配置文件 validator
+ * 与网络包服务端校验逻辑的单一来源（SRP）。
+ */
 public final class ModConfig {
 
 	/**
 	 * 过滤模式枚举
 	 * <p>
-	 * NeoForge ConfigurationScreen 对枚类型会自动渲染循环切换按钮，
+	 * 配置屏幕对枚举类型会自动渲染循环切换按钮，
 	 * 用户可以按顺序切换模式。
 	 */
 	public enum FilterMode {
@@ -116,6 +123,23 @@ public final class ModConfig {
 	public static final ForgeConfigSpec COMMON_SPEC;
 	public static final CommonConfig COMMON;
 
+	public static final String LEGACY_SERVER_FILE_NAME = "productivebeesgenesis-server.toml";
+	public static final String GAMEPLAY_SERVER_FILE_NAME =
+			"productivebeesgenesis-gameplay-server.toml";
+	public static final String MACHINES_SERVER_FILE_NAME =
+			"productivebeesgenesis-machines-server.toml";
+	public static final String CAPACITIES_SERVER_FILE_NAME =
+			"productivebeesgenesis-capacities-server.toml";
+
+	public static final ForgeConfigSpec GAMEPLAY_SERVER_SPEC;
+	public static final ForgeConfigSpec MACHINES_SERVER_SPEC;
+	public static final ForgeConfigSpec CAPACITIES_SERVER_SPEC;
+
+	/**
+	 * 旧代码兼容别名，仅代表玩法配置规格。
+	 * 新代码应使用 {@link #areServerSpecsLoaded()} 或三个具名规格。
+	 */
+	@Deprecated(forRemoval = false)
 	public static final ForgeConfigSpec SERVER_SPEC;
 	public static final ServerConfig SERVER;
 
@@ -128,9 +152,40 @@ public final class ModConfig {
 		COMMON = commonPair.getKey();
 		COMMON_SPEC = commonPair.getValue();
 
-		var serverPair = new ForgeConfigSpec.Builder().configure(ServerConfig::new);
-		SERVER = serverPair.getKey();
-		SERVER_SPEC = serverPair.getValue();
+		var gameplayBuilder = new ForgeConfigSpec.Builder();
+		var machinesBuilder = new ForgeConfigSpec.Builder();
+		var capacitiesBuilder = new ForgeConfigSpec.Builder();
+		SERVER = new ServerConfig(gameplayBuilder, machinesBuilder, capacitiesBuilder);
+		GAMEPLAY_SERVER_SPEC = gameplayBuilder.build();
+		MACHINES_SERVER_SPEC = machinesBuilder.build();
+		CAPACITIES_SERVER_SPEC = capacitiesBuilder.build();
+		SERVER_SPEC = GAMEPLAY_SERVER_SPEC;
+	}
+
+	/** 返回三个服务端配置规格是否均已加载。 */
+	public static boolean areServerSpecsLoaded() {
+		return GAMEPLAY_SERVER_SPEC.isLoaded()
+				&& MACHINES_SERVER_SPEC.isLoaded()
+				&& CAPACITIES_SERVER_SPEC.isLoaded();
+	}
+
+	/** 判断规格是否属于本模组拆分后的服务端配置。 */
+	public static boolean isServerSpec(Object spec) {
+		return spec == GAMEPLAY_SERVER_SPEC
+				|| spec == MACHINES_SERVER_SPEC
+				|| spec == CAPACITIES_SERVER_SPEC;
+	}
+
+	/** 保存全部服务端配置规格。 */
+	public static void saveServerSpecs() {
+		GAMEPLAY_SERVER_SPEC.save();
+		MACHINES_SERVER_SPEC.save();
+		CAPACITIES_SERVER_SPEC.save();
+	}
+
+	/** 保存玩法服务端配置。 */
+	public static void saveGameplayServerSpec() {
+		GAMEPLAY_SERVER_SPEC.save();
 	}
 
 	// ========== 跨字段联合校验（Task 13）==========
@@ -145,18 +200,17 @@ public final class ModConfig {
 	/**
 	 * 跨字段联合校验与自动修正。
 	 * <p>
-	 * NeoForge {@link ForgeConfigSpec} 仅支持单字段 validator（如 {@code defineInRange}），
+	 * {@link ForgeConfigSpec} 仅支持单字段 validator（如 {@code defineInRange}），
 	 * 无法表达跨字段约束（如 min <= max）。此方法在配置加载/重载事件中调用，
-	 * 主动检查并修正逻辑冲突的配置值，避免运行时反复触发被动防御逻辑
-	 * （{@code BeeRecipeReloader} 的 min/max 交换、{@code TileComponentEjectorMixin} 的 active 降级）。
+	 * 主动检查并修正逻辑冲突的配置值，避免运行时反复触发被动防御逻辑。
 	 * <p>
 	 * 修正规则：
 	 * <ul>
 	 *   <li>{@code produceOutputMin} > {@code produceOutputMax}：交换两者，保证 min <= max</li>
 	 *   <li>{@code mekCentrifugeEjectDelayActive} > {@code mekCentrifugeEjectDelay}：
-	 *       将 active 降为 idle，避免活动延迟大于空闲延迟的反直觉组合</li>
+	 *       将 active 降为 idle（1.20.1 移植版暂存键，批次 4 移除）</li>
 	 *   <li>{@code apiaryEjectDelayActive} > {@code apiaryEjectDelay}：
-	 *       将 active 降为 idle（蜂箱独立配置，与离心机互不影响）</li>
+	 *       将 active 降为 idle（蜂箱独立配置，同上）</li>
 	 * </ul>
 	 * <p>
 	 * 线程安全：仅在配置加载/重载事件回调（主线程）中调用，ConfigValue.get/set 内部已对配置读写加锁，
@@ -165,7 +219,7 @@ public final class ModConfig {
 	 * @return true 如果至少修正了一项配置（调用方据此决定是否需要 spec.save() 持久化）
 	 */
 	public static boolean validateAndFixCrossFields() {
-		if (!SERVER_SPEC.isLoaded()) {
+		if (!areServerSpecsLoaded()) {
 			// SERVER 配置仅在服务端/单人存档加载时可用，客户端未加载时跳过
 			return false;
 		}
@@ -185,7 +239,7 @@ public final class ModConfig {
 			CROSS_FIELD_LOGGER.error("校验 produceOutputMin/Max 时发生异常", e);
 		}
 
-		// 校验2：mekCentrifugeEjectDelayActive <= mekCentrifugeEjectDelay
+		// 校验2：mekCentrifugeEjectDelayActive <= mekCentrifugeEjectDelay（旧键，批次 4 移除）
 		try {
 			int idleDelay = SERVER.mekCentrifugeEjectDelay.get();
 			int activeDelay = SERVER.mekCentrifugeEjectDelayActive.get();
@@ -199,7 +253,7 @@ public final class ModConfig {
 			CROSS_FIELD_LOGGER.error("校验 ejectDelay/ejectDelayActive 时发生异常", e);
 		}
 
-		// 校验3：apiaryEjectDelayActive <= apiaryEjectDelay（蜂箱独立配置）
+		// 校验3：apiaryEjectDelayActive <= apiaryEjectDelay（蜂箱独立配置，旧键，批次 4 移除）
 		try {
 			int idleDelay = SERVER.apiaryEjectDelay.get();
 			int activeDelay = SERVER.apiaryEjectDelayActive.get();
@@ -214,9 +268,6 @@ public final class ModConfig {
 		}
 
 		// 校验4：ejectSkipUnchanged=false 时 ejectSkipTicks 配置不生效（仅警告，不强制重置）
-		// 依赖关系：ejectSkipTicks 仅在 ejectSkipUnchanged=true 时有意义（用于跳过未变更物品的弹出冷却）。
-		// 当 ejectSkipUnchanged=false 时，离心机不会跳过未变更物品，ejectSkipTicks 配置项无作用。
-		// 此处仅输出警告提示用户配置不一致，不强制重置以尊重用户显式配置的值（便于后续切换 ejectSkipUnchanged 时复用）。
 		try {
 			if (Boolean.FALSE.equals(SERVER.mekCentrifugeEjectSkipUnchanged.get())
 					&& SERVER.mekCentrifugeEjectSkipTicks.get() > 0) {

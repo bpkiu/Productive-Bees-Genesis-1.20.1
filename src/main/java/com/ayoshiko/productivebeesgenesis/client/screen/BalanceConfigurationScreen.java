@@ -134,8 +134,9 @@ public final class BalanceConfigurationScreen extends OptionsSubScreen {
 	}
 
 	private static void saveServerSpec() {
-		if (ModConfig.SERVER_SPEC != null && ModConfig.SERVER_SPEC.isLoaded()) {
-			ModConfig.SERVER_SPEC.save();
+		// 平衡键位于 gameplay 服务端配置文件，仅保存该文件即可
+		if (ModConfig.areServerSpecsLoaded()) {
+			ModConfig.saveGameplayServerSpec();
 		}
 	}
 

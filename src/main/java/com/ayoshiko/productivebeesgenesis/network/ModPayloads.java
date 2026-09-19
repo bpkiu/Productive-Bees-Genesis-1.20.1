@@ -324,7 +324,7 @@ public final class ModPayloads {
 		}
 
 		// 2. 配置加载状态校验
-		if (!ModConfig.SERVER_SPEC.isLoaded()) {
+		if (!ModConfig.areServerSpecsLoaded()) {
 			serverPlayer.sendSystemMessage(Component.translatable(
 					"productivebeesgenesis.config.sync.not_loaded"));
 			LogThrottle.warn("filter_sync_spec_not_loaded", "收到过滤配置同步包但 SERVER_SPEC 未加载");
@@ -366,7 +366,8 @@ public final class ModPayloads {
 		try {
 			ModConfig.SERVER.myriadCreationsFilteredBeeTypes.set(validated);
 			ModConfig.SERVER.myriadCreationsFilterMode.set(filterMode);
-			ModConfig.SERVER_SPEC.save();
+			// 过滤键位于 gameplay 服务端配置文件，仅保存该文件即可
+			ModConfig.saveGameplayServerSpec();
 			MyriadCreationsEventHandler.invalidateFilterCache();
 		} catch (Exception e) {
 			LogThrottle.error("filter_sync_exception", "处理过滤配置同步包时发生异常", e);

@@ -5,34 +5,35 @@ import net.minecraftforge.common.ForgeConfigSpec;
 import java.util.List;
 
 /**
-	 * 服务端配置 — 存档级别配置
-	 * <p>
-	 * 从 {@link ModConfig} 抽取的独立配置类(Task 21),遵循单一职责原则(SRP)。
-	 * 随存档保存,不同存档可拥有不同配置。世界加载时自动生效,无需执行 /reload。
-	 * 实例由 {@link ModConfig#SERVER} 聚合持有,外部访问路径 {@code ModConfig.SERVER.xxx} 保持不变。
-	 * <p>
-	 * 校验逻辑(颜色、ResourceLocation、枚举值集合)复用 {@link ModConfig} 中的 package-private
-	 * validator 方法与常量,保证配置文件 validator 与网络包服务端校验逻辑单一来源(SRP)。
-	 * <p>
-	 * <b>职责拆分(Task 12 / Task 19)</b>:本类作为聚合入口持有 {@link ConfigSectionRegistry},
-	 * 子配置段创建/查找逻辑委托至注册表,本类仅保留 Builder 入口与基础配置定义。
-	 * 为向后兼容保留 public final 委托字段(指向同一 ConfigValue 实例,零开销):
-	 * <ul>
-	 *   <li>{@link BeeAttributeConfigSection} — 万象创世蜜蜂属性覆盖配置(bee_attributes.*)</li>
-	 *   <li>{@link CentrifugeConfigSection} — MEK 离心机配置(mek_centrifuge.*)</li>
-	 *   <li>{@link ApiaryConfigSection} — MEK 通用机械蜂箱配置(mek_apiary.*,Task 18 新增)</li>
-	 * </ul>
-	 * 配置键名、层级、注册顺序与抽取前完全一致,纯重构无行为变更。
-	 * <p>
-	 * <b>v2.0.0 条件化注册与 null 守卫</b>:AE2/EM 相关委托字段在对应附属未加载时为 null。
-	 * 访问处需通过 {@code Ae2IntegrationLoader.isAe2Loaded()} 或
-	 * {@code MekCompatHooks.isEvolvedMekanismLoaded()} 守卫避免 NPE。
-	 * <p>
-	 * <b>v2.0.0 子段抽取</b>:离心机堆叠倍率/流体罐倍率已抽取至
-	 * {@link StackMultiplierConfigSection} / {@link FluidTankMultiplierConfigSection}。
-	 * 外部访问需通过 {@code ModConfig.SERVER.centrifuge().stackMultiplier.xxx.get()}
-	 * 或 {@code ModConfig.SERVER.centrifuge().fluidTankMultiplier.xxx.get()}。
-	 */
+ * 服务端配置 — 存档级别配置
+ * <p>
+ * 从 {@link ModConfig} 抽取的独立配置类(Task 21),遵循单一职责原则(SRP)。
+ * 随存档保存,不同存档可拥有不同配置。世界加载时自动生效,无需执行 /reload。
+ * 实例由 {@link ModConfig#SERVER} 聚合持有；基础配置和非倍率委托字段继续通过
+ * {@code ModConfig.SERVER.xxx} 访问，等级倍率统一通过各配置段访问。
+ * <p>
+ * <b>1.0.7 三文件拆分</b>：构造函数接收三个 Builder，配置键按领域分布：
+ * <ul>
+ *   <li>gameplay（{@code productivebeesgenesis-gameplay-server.toml}）— 蜜蜂玩法、平衡、过滤</li>
+ *   <li>machines（{@code productivebeesgenesis-machines-server.toml}）— 离心机/蜂箱机器参数</li>
+ *   <li>capacities（{@code productivebeesgenesis-capacities-server.toml}）— 容量矩阵（数组化）</li>
+ * </ul>
+ * 旧单文件由 {@link ServerConfigMigrationService} 事务式迁移。
+ * <p>
+ * <b>职责拆分(Task 12 / Task 19)</b>:本类作为聚合入口持有 {@link ConfigSectionRegistry},
+ * 子配置段创建/查找逻辑委托至注册表,本类仅保留 Builder 入口与基础配置定义。
+ * 为向后兼容保留 public final 委托字段(指向同一 ConfigValue 实例,零开销):
+ * <ul>
+ *   <li>{@link BeeAttributeConfigSection} — 万象创世蜜蜂属性覆盖配置(bee_attributes.*)</li>
+ *   <li>{@link CentrifugeConfigSection} — MEK 离心机配置(mek_centrifuge.*)</li>
+ *   <li>{@link ApiaryConfigSection} — MEK 通用机械蜂箱配置(mek_apiary.*,Task 18 新增)</li>
+ *   <li>{@link ExternalLogisticsConfigSection} — 外部物流互操作(external_logistics.*)</li>
+ * </ul>
+ * <p>
+ * <b>1.20.1 移植说明</b>：主线 1.0.7 已移除弹出节流键；本移植版旧 Ejector Mixin 仍在
+ * 消费这些键（批次 4 logistics 迁移后移除），对应委托字段暂时保留。
+ * apiaryStackXxx 逐等级键已删除，蜂箱容量倍率改经 {@link FactoryTierConfigService} 快照读取。
+ */
 public final class ServerConfig {
 
 	// ========== 配置段注册表(Task 12 抽取)==========
@@ -44,6 +45,8 @@ public final class ServerConfig {
 	public CentrifugeConfigSection centrifuge() { return sections.centrifuge(); }
 	/** 获取 MEK 通用机械蜂箱配置段(Task 18 新增) */
 	public ApiaryConfigSection apiary() { return sections.apiary(); }
+	/** 获取外部物流互操作配置段(1.0.7 新增) */
+	public ExternalLogisticsConfigSection externalLogistics() { return sections.externalLogistics(); }
 
 	// ========== 万象创世蜜蜂总开关(存档级别)==========
 	public final ForgeConfigSpec.BooleanValue myriadCreationsEnabled;
@@ -124,47 +127,47 @@ public final class ServerConfig {
 	/** 多流体槽模式开关:false=单槽共享(默认),true=按流体类型动态分配独立槽位 */
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeMultiFluidTank;
 	/**
-	 * v2.0.9: 每种流体类型最大占用槽位数(委托自 CentrifugeConfigSection)
+	 * 每种流体类型最大占用槽位数(委托自 CentrifugeConfigSection)
 	 * <br/>
 	 * 0=自动计算 maxTanks/2,>0=手动指定配额,防止高产出流体占用所有槽位
 	 */
 	public final ForgeConfigSpec.IntValue mekCentrifugeMaxTanksPerFluid;
 	/**
-	 * Task 6: 流体弹出速率(mB/tick),默认 256,范围 1-Integer.MAX_VALUE
+	 * 流体弹出速率(mB/tick),默认 256,范围 1-Integer.MAX_VALUE
 	 * <br/>
 	 * 委托自 CentrifugeConfigSection,由 AbstractMekCentrifugeFactory 构造函数注入 Ejector。
 	 * 100-tick CAS 缓存读取避免 TPS 退化(参考 MultiFluidSideConfigHandler.getCachedEjectRate)。
 	 */
 	public final ForgeConfigSpec.IntValue mekCentrifugeFluidEjectRate;
 	public final ForgeConfigSpec.IntValue mekCentrifugeCombBlockMultiplier;
-	// Task 13: AE2/管道拉取限流(防止 ME 接口过载拉取触发全量排序扫描)
+	// AE2/管道拉取限流(从未接线,保留键位,批次 4 停用)
 	public final ForgeConfigSpec.IntValue mekCentrifugeMaxExtractPerTick;
-	// Task 14: Ejector 输出阻塞冷却参数(解决输出侧阻塞时 outputItems 高频尝试导致 TPS 暴跌)
+	// Ejector 输出阻塞冷却参数(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectBlockedThreshold;
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectBlockedCooldown;
-	// Task 16: 输出槽内容未变化时跳过 outputItems,降低高倍加速下的 CPU 开销
+	// 输出槽内容未变化时跳过 outputItems(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeEjectSkipUnchanged;
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectSkipTicks;
-	// Task 24: 最大弹出速度模式:关闭 Ejector 节流以最大化物品弹出速度
+	// 最大弹出速度模式(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeEjectMaxSpeedMode;
-	// Task 23: Ejector 持续高负载下降频:最小调用间隔与长冷却
+	// Ejector 持续高负载下降频:最小调用间隔与长冷却(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectMinInterval;
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectBusyThreshold;
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectBusyCooldown;
-	// Step 5: 单 tick 最大弹出次数上限(0=无限制),限制 256× 加速下高频 outputItems 调用
+	// 单 tick 最大弹出次数上限(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.IntValue mekCentrifugeEjectMaxPerTick;
-	// Task 2: 单 tick 最大 PB 配方操作数上限(0=无限制),防止 256× 加速下 CPU 过载
+	// 单 tick 最大 PB 配方操作数上限(0=无限制),防止 256× 加速下 CPU 过载
 	public final ForgeConfigSpec.IntValue mekCentrifugeMaxOpsPerTick;
-	// AE2 直接输出集成开关 — AE2 未加载时为 null(条件化注册)
+	// AE2 直接输出集成开关
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeAeOutputEnabled;
-	// AE2 流体输出集成开关(独立于物品输出)— AE2 未加载时为 null
+	// AE2 流体输出集成开关(独立于物品输出)
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeAeFluidOutputEnabled;
-	// v2.0.0: AE 网络能量输入集成 — AE2/AppliedFlux 未加载时为 null(条件化注册)
+	// AE 网络能量输入集成
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeAeEnergyInputEnabled;
 	public final ForgeConfigSpec.BooleanValue mekCentrifugePreferAppliedFluxOverAeEnergy;
-	// 允许提取 AE2 原生能量 — AppliedFlux 未加载时为 null(条件化注册)
+	// 允许提取 AE2 原生能量
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeAeNativeEnergyInputEnabled;
-	// AE2 输入拉取集成 — AE2 未加载时为 null(条件化注册)
+	// AE2 输入拉取集成
 	public final ForgeConfigSpec.BooleanValue mekCentrifugeAeInputEnabled;
 	public final ForgeConfigSpec.IntValue mekCentrifugeAeInputRatePerTick;
 	public final ForgeConfigSpec.IntValue mekCentrifugeAeInputIntervalTicks;
@@ -182,37 +185,20 @@ public final class ServerConfig {
 	public final ForgeConfigSpec.LongValue apiaryEnergyPerTick;
 	public final ForgeConfigSpec.IntValue apiaryProcessingTime;
 	public final ForgeConfigSpec.IntValue apiaryFluidTankCapacity;
+	// 弹出策略(旧 Mixin 消费,批次 4 移除)
 	public final ForgeConfigSpec.IntValue apiaryEjectDelay;
 	public final ForgeConfigSpec.IntValue apiaryEjectDelayActive;
 	public final ForgeConfigSpec.BooleanValue apiaryEjectMaxSpeedMode;
 	public final ForgeConfigSpec.IntValue apiaryEjectMaxPerTick;
 	public final ForgeConfigSpec.IntValue apiaryEjectBlockedThreshold;
 	public final ForgeConfigSpec.IntValue apiaryEjectBlockedCooldown;
-	public final ForgeConfigSpec.IntValue apiaryStackBasic;
-	public final ForgeConfigSpec.IntValue apiaryStackAdvanced;
-	public final ForgeConfigSpec.IntValue apiaryStackElite;
-	public final ForgeConfigSpec.IntValue apiaryStackUltimate;
-	public final ForgeConfigSpec.IntValue apiaryStackMeAbsolute;
-	public final ForgeConfigSpec.IntValue apiaryStackMeSupreme;
-	public final ForgeConfigSpec.IntValue apiaryStackMeCosmic;
-	public final ForgeConfigSpec.IntValue apiaryStackMeInfinite;
-	// EM 工厂蜂箱堆叠倍率 — EM 未加载时为 null(条件化注册)
-	public final ForgeConfigSpec.IntValue apiaryStackEmOverclocked;
-	public final ForgeConfigSpec.IntValue apiaryStackEmQuantum;
-	public final ForgeConfigSpec.IntValue apiaryStackEmDense;
-	public final ForgeConfigSpec.IntValue apiaryStackEmMultiversal;
-	public final ForgeConfigSpec.IntValue apiaryStackEmCreative;
-	public final ForgeConfigSpec.IntValue apiaryStackEmeAbsoluteOverclocked;
-	public final ForgeConfigSpec.IntValue apiaryStackEmeSupremeQuantum;
-	public final ForgeConfigSpec.IntValue apiaryStackEmeCosmicDense;
-	public final ForgeConfigSpec.IntValue apiaryStackEmeInfiniteMultiversal;
-	// AE2 集成 — AE2 未加载时为 null(条件化注册)
+	// AE2 集成
 	public final ForgeConfigSpec.BooleanValue apiaryAeOutputEnabled;
 	public final ForgeConfigSpec.BooleanValue apiaryAeFluidOutputEnabled;
 	public final ForgeConfigSpec.BooleanValue apiaryAeEnergyInputEnabled;
-	// AE 网络能量优先级 — AppliedFlux 未加载时为 null(条件化注册)
+	// AE 网络能量优先级
 	public final ForgeConfigSpec.BooleanValue apiaryPreferAppliedFluxOverAeEnergy;
-	// 允许提取 AE2 原生能量 — AppliedFlux 未加载时为 null(条件化注册)
+	// 允许提取 AE2 原生能量
 	public final ForgeConfigSpec.BooleanValue apiaryAeNativeEnergyInputEnabled;
 	// PB升级上限
 	public final ForgeConfigSpec.IntValue apiaryPbUpgradeProductivityMaxCount;
@@ -220,8 +206,17 @@ public final class ServerConfig {
 	public final ForgeConfigSpec.IntValue apiaryPbUpgradeGeneSamplerMaxCount;
 	public final ForgeConfigSpec.IntValue apiaryPbUpgradeBlockMaxCount;
 
-	ServerConfig(ForgeConfigSpec.Builder builder) {
+	// ========== 外部物流互操作 —— 向后兼容委托字段（离心机与蜂箱通用）==========
+	/** 产物直通相邻容器（跳过输出槽缓存） */
+	public final ForgeConfigSpec.BooleanValue externalDirectContainerOutput;
+
+	ServerConfig(
+			ForgeConfigSpec.Builder builder,
+			ForgeConfigSpec.Builder machineBuilder,
+			ForgeConfigSpec.Builder capacityBuilder) {
 		this.sections = new ConfigSectionRegistry();
+
+		// ===== gameplay 文件 =====
 
 		// 万象创世蜜蜂总开关
 		myriadCreationsEnabled = builder
@@ -431,8 +426,11 @@ public final class ServerConfig {
 
 		builder.pop(); // advanced_beehive
 
-		// MEK离心机配置(抽取至 CentrifugeConfigSection,Task 12 委托至 ConfigSectionRegistry)
-		CentrifugeConfigSection centrifuge = this.sections.registerCentrifuge(builder);
+		// ===== machines / capacities 文件 =====
+
+		// MEK离心机配置(抽取至 CentrifugeConfigSection,机器参数入 machines,容量矩阵入 capacities)
+		CentrifugeConfigSection centrifuge = this.sections.registerCentrifuge(
+				machineBuilder, capacityBuilder);
 		// 向后兼容委托字段赋值(指向同一 ConfigValue 实例,零开销)
 		this.mekCentrifugeEnergyPerTick = centrifuge.mekCentrifugeEnergyPerTick;
 		this.mekCentrifugeEnergyStorage = centrifuge.mekCentrifugeEnergyStorage;
@@ -443,7 +441,6 @@ public final class ServerConfig {
 		this.mekCentrifugeMultiFluidTank = centrifuge.mekCentrifugeMultiFluidTank;
 		// v2.0.9: 每种流体类型最大占用槽位数(配额机制)
 		this.mekCentrifugeMaxTanksPerFluid = centrifuge.mekCentrifugeMaxTanksPerFluid;
-		// Task 3: 移除 mekCentrifugeMaxFluidTanks 委托字段(maxTanks 直接使用 tier.processes)
 		this.mekCentrifugeFluidEjectRate = centrifuge.mekCentrifugeFluidEjectRate;
 		this.mekCentrifugeCombBlockMultiplier = centrifuge.mekCentrifugeCombBlockMultiplier;
 		this.mekCentrifugeMaxExtractPerTick = centrifuge.mekCentrifugeMaxExtractPerTick;
@@ -457,7 +454,7 @@ public final class ServerConfig {
 		this.mekCentrifugeEjectBusyCooldown = centrifuge.mekCentrifugeEjectBusyCooldown;
 		this.mekCentrifugeEjectMaxPerTick = centrifuge.mekCentrifugeEjectMaxPerTick;
 		this.mekCentrifugeMaxOpsPerTick = centrifuge.mekCentrifugeMaxOpsPerTick;
-		// 堆叠倍率/流体罐倍率已迁移至子段,外部访问通过 centrifuge().stackMultiplier.xxx / centrifuge().fluidTankMultiplier.xxx
+		// 堆叠倍率/流体罐倍率已迁移至 capacities 子段,运行时经 FactoryTierConfigService 快照读取
 		this.mekCentrifugeAeOutputEnabled = centrifuge.mekCentrifugeAeOutputEnabled;
 		this.mekCentrifugeAeFluidOutputEnabled = centrifuge.mekCentrifugeAeFluidOutputEnabled;
 		// v2.0.0: AE 网络能量输入集成 — 向后兼容委托字段赋值
@@ -478,8 +475,8 @@ public final class ServerConfig {
 		// 熔炉配方兼容总开关委托字段赋值（指向同一 ConfigValue 实例，零开销）
 		this.mekCentrifugeSmeltingCompatEnabled = centrifuge.mekCentrifugeSmeltingCompatEnabled;
 
-		// MEK通用机械蜂箱配置(抽取至 ApiaryConfigSection,Task 12 委托至 ConfigSectionRegistry)
-		ApiaryConfigSection apiary = this.sections.registerApiary(builder);
+		// MEK通用机械蜂箱配置(抽取至 ApiaryConfigSection,机器参数入 machines,容量矩阵入 capacities)
+		ApiaryConfigSection apiary = this.sections.registerApiary(machineBuilder, capacityBuilder);
 		// 向后兼容委托字段赋值(指向同一 ConfigValue 实例,零开销)
 		this.apiaryEnergyPerTick = apiary.apiaryEnergyPerTick;
 		this.apiaryProcessingTime = apiary.apiaryProcessingTime;
@@ -490,24 +487,6 @@ public final class ServerConfig {
 		this.apiaryEjectMaxPerTick = apiary.apiaryEjectMaxPerTick;
 		this.apiaryEjectBlockedThreshold = apiary.apiaryEjectBlockedThreshold;
 		this.apiaryEjectBlockedCooldown = apiary.apiaryEjectBlockedCooldown;
-		this.apiaryStackBasic = apiary.apiaryStackBasic;
-		this.apiaryStackAdvanced = apiary.apiaryStackAdvanced;
-		this.apiaryStackElite = apiary.apiaryStackElite;
-		this.apiaryStackUltimate = apiary.apiaryStackUltimate;
-		this.apiaryStackMeAbsolute = apiary.apiaryStackMeAbsolute;
-		this.apiaryStackMeSupreme = apiary.apiaryStackMeSupreme;
-		this.apiaryStackMeCosmic = apiary.apiaryStackMeCosmic;
-		this.apiaryStackMeInfinite = apiary.apiaryStackMeInfinite;
-		// EM 工厂蜂箱堆叠倍率委托字段赋值(指向同一 ConfigValue 实例,零开销;EM 未加载时为 null)
-		this.apiaryStackEmOverclocked = apiary.apiaryStackEmOverclocked;
-		this.apiaryStackEmQuantum = apiary.apiaryStackEmQuantum;
-		this.apiaryStackEmDense = apiary.apiaryStackEmDense;
-		this.apiaryStackEmMultiversal = apiary.apiaryStackEmMultiversal;
-		this.apiaryStackEmCreative = apiary.apiaryStackEmCreative;
-		this.apiaryStackEmeAbsoluteOverclocked = apiary.apiaryStackEmeAbsoluteOverclocked;
-		this.apiaryStackEmeSupremeQuantum = apiary.apiaryStackEmeSupremeQuantum;
-		this.apiaryStackEmeCosmicDense = apiary.apiaryStackEmeCosmicDense;
-		this.apiaryStackEmeInfiniteMultiversal = apiary.apiaryStackEmeInfiniteMultiversal;
 		this.apiaryAeOutputEnabled = apiary.apiaryAeOutputEnabled;
 		this.apiaryAeFluidOutputEnabled = apiary.apiaryAeFluidOutputEnabled;
 		this.apiaryAeEnergyInputEnabled = apiary.apiaryAeEnergyInputEnabled;
@@ -517,5 +496,10 @@ public final class ServerConfig {
 		this.apiaryPbUpgradeTimeMaxCount = apiary.apiaryPbUpgradeTimeMaxCount;
 		this.apiaryPbUpgradeGeneSamplerMaxCount = apiary.apiaryPbUpgradeGeneSamplerMaxCount;
 		this.apiaryPbUpgradeBlockMaxCount = apiary.apiaryPbUpgradeBlockMaxCount;
+
+		// 外部物流互操作配置（离心机与蜂箱通用，注册在机器参数文件末尾）
+		ExternalLogisticsConfigSection externalLogistics =
+				this.sections.registerExternalLogistics(machineBuilder);
+		this.externalDirectContainerOutput = externalLogistics.externalDirectContainerOutput;
 	}
 }

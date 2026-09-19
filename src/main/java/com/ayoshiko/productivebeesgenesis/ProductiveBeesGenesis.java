@@ -5,8 +5,10 @@ import com.ayoshiko.productivebeesgenesis.apiary.BeeProduceProcessor;
 import com.ayoshiko.productivebeesgenesis.command.DevModeCommand;
 import com.ayoshiko.productivebeesgenesis.client.screen.CustomConfigScreenFactory;
 import com.ayoshiko.productivebeesgenesis.config.BalanceConfig;
-import com.ayoshiko.productivebeesgenesis.config.BalanceConfigCompatibility;
+import com.ayoshiko.productivebeesgenesis.config.ClientConfigMigrationService;
+import com.ayoshiko.productivebeesgenesis.config.FactoryTierConfigService;
 import com.ayoshiko.productivebeesgenesis.config.ModConfig;
+import com.ayoshiko.productivebeesgenesis.config.ServerConfigMigrationService;
 import com.ayoshiko.productivebeesgenesis.datagen.ConditionalBlockLootProvider;
 import com.ayoshiko.productivebeesgenesis.datagen.ModBlockTagsProvider;
 import com.ayoshiko.productivebeesgenesis.datagen.ModLootTables;
@@ -83,6 +85,13 @@ public final class ProductiveBeesGenesis {
 	/** 配方版本号 — 每次 /reload 或数据包重载时递增,通知所有 PB 配方处理器清空缓存。AtomicLong 保证原子递增。 */
 	public static final AtomicLong RECIPE_VERSION = new AtomicLong(0L);
 
+	/** 存档 serverconfig 目录 — 存档级配置迁移重载时使用。 */
+	private static final net.minecraft.world.level.storage.LevelResource SERVER_CONFIG_DIRECTORY =
+			new net.minecraft.world.level.storage.LevelResource("serverconfig");
+
+	/** 三个服务端规格是否已完成本会话的首次初始化（跨字段校验/平衡刷新/倍率快照）。 */
+	private boolean serverConfigsInitialized;
+
 	@SuppressWarnings("removal")
 	public ProductiveBeesGenesis() {
 		LOGGER.info("资源蜜蜂：创世模组初始化中...");
@@ -147,47 +156,55 @@ public final class ProductiveBeesGenesis {
 	}
 
 	/**
-	 * 注册配置文件（CLIENT / COMMON / SERVER）
+	 * 注册配置文件（CLIENT / COMMON / SERVER×3）
 	 * <br/>
-	 * Forge 1.20.1：通过 ModLoadingContext 注册配置（NeoForge 1.21.1 用 ModContainer.registerConfig）
+	 * Forge 1.20.1：通过 ModLoadingContext 注册配置（NeoForge 1.21.1 用 ModContainer.registerConfig）。
+	 * 1.0.7 起服务端配置拆分为 gameplay/machines/capacities 三个文件，均以 SERVER 类型
+	 * 注册（随存档 serverconfig/ 目录生效）；旧单文件由迁移服务事务式拆分。
 	 */
 	@SuppressWarnings("removal")
 	private void registerConfigs() {
 		ModLoadingContext.get().registerConfig(net.minecraftforge.fml.config.ModConfig.Type.CLIENT, ModConfig.CLIENT_SPEC);
 		ModLoadingContext.get().registerConfig(net.minecraftforge.fml.config.ModConfig.Type.COMMON, ModConfig.COMMON_SPEC);
-		ModLoadingContext.get().registerConfig(net.minecraftforge.fml.config.ModConfig.Type.SERVER, ModConfig.SERVER_SPEC);
+		ModLoadingContext.get().registerConfig(
+				net.minecraftforge.fml.config.ModConfig.Type.SERVER,
+				ModConfig.GAMEPLAY_SERVER_SPEC, ModConfig.GAMEPLAY_SERVER_FILE_NAME);
+		ModLoadingContext.get().registerConfig(
+				net.minecraftforge.fml.config.ModConfig.Type.SERVER,
+				ModConfig.MACHINES_SERVER_SPEC, ModConfig.MACHINES_SERVER_FILE_NAME);
+		ModLoadingContext.get().registerConfig(
+				net.minecraftforge.fml.config.ModConfig.Type.SERVER,
+				ModConfig.CAPACITIES_SERVER_SPEC, ModConfig.CAPACITIES_SERVER_FILE_NAME);
 	}
 
 	/**
 	 * 注册配置加载/重载监听器
 	 * <br/>
-	 * 服务端配置加载/重载时：
+	 * 服务端配置加载时：
 	 * <ol>
-	 *   <li>跨字段联合校验并自动修正无效组合（Task 13）</li>
+	 *   <li>记录到迁移服务，三个规格齐备后事务式迁移旧单文件</li>
+	 *   <li>跨字段联合校验 + 平衡预设刷新 + 工厂倍率快照构建（仅一次）</li>
 	 *   <li>应用蜜蜂属性覆盖（按存档生效）</li>
-	 *   <li>重载时额外失效万象创世过滤缓存（Task 15）</li>
-	 *   <li>重载时失效蜂箱槽位上限缓存（Task 3 — stackMultiplier 依赖配置，需主动失效）</li>
 	 * </ol>
+	 * 服务端配置重载时：跨字段校验、蜜蜂属性覆盖、过滤缓存与熔炉配方缓存失效；
+	 * 工厂倍率快照只在 Loading 构建，Reloading 不替换（修改后需重启生效）。
 	 */
 	private void registerConfigListeners(IEventBus eventBus) {
 		eventBus.addListener((ModConfigEvent.Loading event) -> {
-			if (event.getConfig().getSpec() == ModConfig.SERVER_SPEC) {
-				boolean changed = BalanceConfigCompatibility.migrateLegacyConfig(event.getConfig());
-				changed |= ModConfig.validateAndFixCrossFields();
-				changed |= BalanceConfig.refresh(false);
-				if (changed) {
-					ModConfig.SERVER_SPEC.save();
-				}
-				BeeConfigApplier.applyOverrides();
-				MekCentrifugeFactoryHelper.refreshSmeltingCompatConfig();
+			if (isOwnClientConfig(event.getConfig())) {
+				ClientConfigMigrationService.onConfigLoading(event.getConfig());
+			}
+			if (isOwnServerConfig(event.getConfig())) {
+				ServerConfigMigrationService.onConfigLoading(event.getConfig());
+				initializeServerConfigs();
 			}
 		});
 		eventBus.addListener((ModConfigEvent.Reloading event) -> {
-			if (event.getConfig().getSpec() == ModConfig.SERVER_SPEC) {
+			if (isOwnServerConfig(event.getConfig()) && ModConfig.areServerSpecsLoaded()) {
 				boolean changed = ModConfig.validateAndFixCrossFields();
 				changed |= BalanceConfig.refresh(true);
 				if (changed) {
-					ModConfig.SERVER_SPEC.save();
+					ModConfig.saveServerSpecs();
 				}
 				BeeConfigApplier.applyOverrides();
 				MekCentrifugeFactoryHelper.refreshSmeltingCompatConfig();
@@ -196,18 +213,51 @@ public final class ProductiveBeesGenesis {
 				MyriadCreationsEventHandler.invalidateFilterCache();
 				// 同步万象创世启用状态缓存（避免每 tick 32 次 volatile read 配置查询）
 				MyriadCreationsEventHandler.invalidateEnabledCache();
-				// 槽位倍率配置不采用热更新 — 输入/输出槽倍率（apiaryStackXxx、
-				// mekCentrifugeStackXxx、mekCentrifugeInputStackXxx）仅在游戏重启后生效。
-				// 槽位首次 getLimit 时读取配置并永久缓存（MULTIPLIER_VERSION 永不递增），
-				// 配置文件修改不影响已运行的槽位实例，避免热重载导致的性能抖动。
+				// 工厂倍率快照只在 Loading 构建，Reloading 不替换；修改后仍需重启游戏生效。
 			}
 			// 通知 RecipeReloadRetryManager 检测 EM/ME 配置死循环（Task 8）
-			// 注：放在 SERVER_SPEC 判断之外 — EM/ME 配置重载事件不匹配我们的 spec，
-			// 但仍需通知死循环检测器进行死循环判定
-			RecipeReloadRetryManager.onConfigFileChanged(
-					event.getConfig().getFullPath().toString(),
-					event.getConfig().getModId());
+			// 注：放在本模组 SERVER 判断之外 — EM/ME 配置重载事件不匹配我们的 spec，
+			// 但仍需通知死循环检测器进行死循环判定；客户端同步的服务端配置没有本地路径，
+			// getFullPath 对内存配置会抛异常，按空路径降级处理
+			String configPath = "";
+			try {
+				configPath = event.getConfig().getFullPath().toString();
+			} catch (IllegalStateException | ClassCastException ignored) {
+				// 内存同步配置（客户端收到的 SERVER 配置回执）无文件路径
+			}
+			RecipeReloadRetryManager.onConfigFileChanged(configPath, event.getConfig().getModId());
 		});
+	}
+
+	/** 仅处理本模组的 CLIENT 配置事件。 */
+	private static boolean isOwnClientConfig(net.minecraftforge.fml.config.ModConfig config) {
+		return config != null
+				&& MOD_ID.equals(config.getModId())
+				&& config.getType() == net.minecraftforge.fml.config.ModConfig.Type.CLIENT
+				&& config.getSpec() == ModConfig.CLIENT_SPEC;
+	}
+
+	/** 三个服务端规格全部就绪后只初始化一次运行时配置快照。 */
+	private synchronized void initializeServerConfigs() {
+		if (serverConfigsInitialized || !ModConfig.areServerSpecsLoaded()) return;
+		serverConfigsInitialized = true;
+		boolean changed = ModConfig.validateAndFixCrossFields();
+		changed |= BalanceConfig.refresh(false);
+		FactoryTierConfigService.load(ModConfig.SERVER);
+		if (changed) ModConfig.saveServerSpecs();
+		BeeConfigApplier.applyOverrides();
+		MekCentrifugeFactoryHelper.refreshSmeltingCompatConfig();
+	}
+
+	/**
+	 * 仅处理本模组注册的 SERVER 配置，避免其他模组的配置事件触发本模组逻辑。
+	 * 配置同步到客户端后 spec 身份仍保持不变，mod id 和类型则提供额外边界校验。
+	 */
+	private static boolean isOwnServerConfig(net.minecraftforge.fml.config.ModConfig config) {
+		return config != null
+				&& MOD_ID.equals(config.getModId())
+				&& config.getType() == net.minecraftforge.fml.config.ModConfig.Type.SERVER
+				&& ModConfig.isServerSpec(config.getSpec());
 	}
 
 	/**
@@ -257,8 +307,37 @@ public final class ProductiveBeesGenesis {
 		// 合成升级数据转移已迁移至 ApiaryShapedRecipe.assemble（recipe 包），
 		// 通过重写 MekanismShapedRecipe.assemble 在输入消耗前转移 BLOCK_ENTITY_DATA，
 		// 避免 ItemCraftedEvent 在输入被消耗后读到空物品的时序问题。
+		// 服务器即将启动时处理存档级配置迁移的重载请求
+		MinecraftForge.EVENT_BUS.addListener(this::onServerAboutToStart);
 		// 服务器停止时清理静态缓存，防止跨存档数据泄漏
 		MinecraftForge.EVENT_BUS.addListener(this::onServerStopped);
+	}
+
+	/**
+	 * 迁移落盘后重新按 Forge 的存档覆盖规则加载三个 SERVER 配置。
+	 * <p>
+	 * 仅当存档 {@code serverconfig/} 里原本没有拆分文件、Forge 已把配置绑定到全局
+	 * config 目录时才需要重载；整合包只改全局 config 的情况由迁移服务直接替换内存对象。
+	 * {@code unloadConfigs} 是全局操作，会让所有模组多收一轮配置事件，
+	 * 因此这里限定为“确实发生了存档级迁移”这一次，并捕获异常避免拖垮开服流程。
+	 */
+	private void onServerAboutToStart(net.minecraftforge.event.server.ServerAboutToStartEvent event) {
+		if (!ServerConfigMigrationService.consumeReloadRequired()) return;
+		java.nio.file.Path serverConfigDirectory = event.getServer().getWorldPath(SERVER_CONFIG_DIRECTORY);
+		try {
+			serverConfigsInitialized = false;
+			net.minecraftforge.fml.config.ConfigTracker.INSTANCE.unloadConfigs(
+					net.minecraftforge.fml.config.ModConfig.Type.SERVER, serverConfigDirectory);
+			net.minecraftforge.fml.config.ConfigTracker.INSTANCE.loadConfigs(
+					net.minecraftforge.fml.config.ModConfig.Type.SERVER, serverConfigDirectory);
+			LOGGER.info("存档级配置迁移完成，已按存档覆盖规则重新加载服务端配置：{}",
+					serverConfigDirectory);
+		} catch (RuntimeException exception) {
+			LOGGER.error("重新加载存档级服务端配置失败，本次会话使用迁移前的配置对象：{}",
+					serverConfigDirectory, exception);
+		} finally {
+			initializeServerConfigs();
+		}
 	}
 
 	/**
@@ -389,6 +468,12 @@ public final class ProductiveBeesGenesis {
 		safeClear(ServerTickTimeMonitor.getInstance()::invalidate, "ServerTickTimeMonitor");
 		// 复位全局游戏刻时钟 — 槽位的「外部退回窗口」依赖它判定过期，跨存档必须归零
 		safeClear(ServerTickClock::reset, "ServerTickClock");
+		// 复位服务端配置三规格初始化标记 — 下个存档需重新构建运行时快照
+		serverConfigsInitialized = false;
+		// 清理配置迁移服务的世界级状态 — 防止跨存档持有配置对象
+		safeClear(ServerConfigMigrationService::reset, "ServerConfigMigrationService");
+		// 复位工厂等级倍率快照 — 防止跨存档保留旧容量矩阵
+		safeClear(FactoryTierConfigService::resetToDefaults, "FactoryTierConfigService");
 		safeClear(LogThrottle::clearAll, "LogThrottle");
 	}
 
