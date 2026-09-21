@@ -284,6 +284,57 @@ public final class RandomHoneycombSelector {
 	// ========== 模板构建 ==========
 
 	/**
+	 * 规范化外部解析得到的蜜脾模板。
+	 * <p>
+	 * 可配置蜜脾若配方省略 bee_type（PB 会按 ingredient 蜂种补全），在此显式补入；
+	 * ghostly/milky/powdery 等独立物品则原样保留，避免错误伪装成 configurable_honeycomb。
+	 *
+	 * @param beeType 蜜蜂类型
+	 * @param resolvedTemplate 蜂箱配方解析出的蜜脾模板
+	 * @return 可安全缓存的单个蜜脾模板
+	 */
+	public static ItemStack normalizeHoneycombTemplate(
+			ResourceLocation beeType,
+			ItemStack resolvedTemplate) {
+		if (resolvedTemplate == null || resolvedTemplate.isEmpty()) {
+			ItemStack fallback = new ItemStack(ModItems.CONFIGURABLE_HONEYCOMB.get());
+			BeeTypeNbt.setBeeType(fallback, beeType);
+			return fallback;
+		}
+		ItemStack template = resolvedTemplate.copyWithCount(1);
+		if (template.getItem() == ModItems.CONFIGURABLE_HONEYCOMB.get()
+				&& BeeTypeNbt.getBeeType(template) == null) {
+			BeeTypeNbt.setBeeType(template, beeType);
+		}
+		return template;
+	}
+
+	/**
+	 * 为实际蜜脾模板构建对应的蜜脾块模板。
+	 * <p>
+	 * 优先调用 PB 自身映射，正确覆盖 Ghostly/Milky/Powdery 等独立蜜脾；
+	 * 仅在映射不可用时回退为带 bee_type 的 configurable_comb。
+	 *
+	 * @param beeType 蜜蜂类型
+	 * @param honeycombTemplate 实际单蜜脾模板
+	 * @return 对应的蜜脾块模板
+	 */
+	public static ItemStack buildCombBlockTemplate(
+			ResourceLocation beeType,
+			ItemStack honeycombTemplate) {
+		try {
+			ItemStack block = cy.jdkdigital.productivebees.util.BeeHelper
+					.getCombBlockFromHoneyComb(honeycombTemplate);
+			if (!block.isEmpty()) return block.copyWithCount(1);
+		} catch (RuntimeException ignored) {
+			// 数据包可能声明无法映射到蜜脾块的外部蜜脾；下方使用兼容回退。
+		}
+		ItemStack fallback = new ItemStack(ModItems.CONFIGURABLE_COMB_BLOCK.get());
+		BeeTypeNbt.setBeeType(fallback, beeType);
+		return fallback;
+	}
+
+	/**
 	 * 为指定蜜蜂类型缓存构建蜜脾模板数组
 	 * <p>
 	 * 模板在缓存更新时一次性构建，避免高频生成时重复创建 ItemStack 和设置数据组件。
@@ -303,18 +354,16 @@ public final class RandomHoneycombSelector {
 	}
 
 	/**
-	 * 为指定蜜蜂类型缓存构建蜜脾块模板数组
+	 * 为指定蜜蜂类型缓存构建蜜脾块模板数组。
 	 *
 	 * @param cachedBeeTypes 蜜蜂类型缓存
 	 * @return 蜜脾块模板数组
 	 */
 	public static ItemStack[] buildCombBlockTemplates(List<ResourceLocation> cachedBeeTypes) {
-		if (cachedBeeTypes == null || cachedBeeTypes.isEmpty()) return new ItemStack[0];
-		ItemStack[] templates = new ItemStack[cachedBeeTypes.size()];
-		for (int i = 0; i < cachedBeeTypes.size(); i++) {
-			ItemStack stack = new ItemStack(ModItems.CONFIGURABLE_COMB_BLOCK.get());
-			BeeTypeNbt.setBeeType(stack, cachedBeeTypes.get(i));
-			templates[i] = stack;
+		ItemStack[] honeycombTemplates = buildHoneycombTemplates(cachedBeeTypes);
+		ItemStack[] templates = new ItemStack[honeycombTemplates.length];
+		for (int i = 0; i < honeycombTemplates.length; i++) {
+			templates[i] = buildCombBlockTemplate(cachedBeeTypes.get(i), honeycombTemplates[i]);
 		}
 		return templates;
 	}
